@@ -1,23 +1,59 @@
 # Ternary Fission Energy Emulation System
 
+[![Build Status](https://github.com/davestj/ternary-fission-reactor/workflows/Build%20and%20Test/badge.svg)](https://github.com/davestj/ternary-fission-reactor/actions)
+[![Release](https://img.shields.io/github/v/release/davestj/ternary-fission-reactor?include_prereleases)](https://github.com/davestj/ternary-fission-reactor/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![C++](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://isocpp.org/std/the-standard)
+[![Go](https://img.shields.io/badge/Go-1.23+-00ADD8.svg)](https://golang.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://hub.docker.com/)
+
+[![GitHub issues](https://img.shields.io/github/issues/davestj/ternary-fission-reactor)](https://github.com/davestj/ternary-fission-reactor/issues)
+[![GitHub forks](https://img.shields.io/github/forks/davestj/ternary-fission-reactor)](https://github.com/davestj/ternary-fission-reactor/network)
+[![GitHub stars](https://img.shields.io/github/stars/davestj/ternary-fission-reactor)](https://github.com/davestj/ternary-fission-reactor/stargazers)
+[![Contributors](https://img.shields.io/github/contributors/davestj/ternary-fission-reactor)](https://github.com/davestj/ternary-fission-reactor/graphs/contributors)
+
 **Author:** bthlops (David StJ)  
-**Date:** July 29, 2025  
-**Version:** 1.0.0  
+**Version:** 1.1.1-alpha  
+**Last Updated:** July 30, 2025  
 
-## Project Overview
+> High-performance ternary nuclear fission simulation with C++ physics engine, Go REST API, and Docker deployment. Maps nuclear energy to computational resources with real-time monitoring and conservation law verification.
 
-The Ternary Fission Energy Emulation System is a high-performance, multi-language application designed to simulate ternary nuclear fission processes through computational resource mapping. This system uniquely represents nuclear energy fields by consuming actual system resources (memory allocation and CPU cycles) to create a physically-inspired energy simulation environment.
+## 🚀 Quick Start
 
-### Key Features
+```bash
+# Clone and build
+git clone https://github.com/davestj/ternary-fission-reactor.git
+cd ternary-fission-reactor
+make all
 
-- **High-Performance C++ Core**: Optimized physics simulation engine with real conservation law verification
-- **Concurrent Go API**: RESTful API server with WebSocket support for real-time monitoring
-- **Energy Field Mapping**: Novel approach using memory allocation and CPU cycles to represent energy states
-- **Encryption-Based Dissipation**: Energy decay simulation through cryptographic operations
-- **Real-Time Monitoring**: Live WebSocket feeds for simulation monitoring and control
-- **Production Ready**: Complete build system, testing, containerization, and deployment tools
+# Run API server
+./bin/ternary-api -config configs/ternary_fission.conf -port 8080
 
-## System Architecture
+# Test endpoints
+curl http://localhost:8080/api/v1/health
+```
+
+## 📊 Project Stats
+
+![GitHub repo size](https://img.shields.io/github/repo-size/davestj/ternary-fission-reactor)
+![Lines of code](https://img.shields.io/tokei/lines/github/davestj/ternary-fission-reactor)
+![GitHub last commit](https://img.shields.io/github/last-commit/davestj/ternary-fission-reactor)
+
+**Latest Release:** [Download v1.1.1-alpha](https://github.com/davestj/ternary-fission-reactor/releases/latest)
+- Ubuntu 24.04 x64 binaries
+- Complete source code
+- Docker images
+- Documentation
+
+## ⚡ Key Features
+
+- **High-Performance C++ Core**: Optimized physics simulation engine with conservation law verification
+- **Concurrent Go API**: RESTful server with WebSocket real-time monitoring
+- **Novel Energy Mapping**: 1 MeV = 1MB memory + 1B CPU cycles
+- **Encryption-Based Dissipation**: Energy decay through cryptographic operations
+- **Production Ready**: Docker deployment, Prometheus metrics, comprehensive testing
+
+## 🏗️ System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -48,136 +84,80 @@ The Ternary Fission Energy Emulation System is a high-performance, multi-languag
 │  │ Simulator   │  │   System    │  │   & Validation  │  │
 │  └─────────────┘  └─────────────┘  └─────────────────┘  │
 └─────────────────────────────────────────────────────────┘
-                           │
-                    System Resources
-                           │
-┌─────────────────────────────────────────────────────────┐
-│              Hardware Resource Layer                    │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐  │
-│  │ Memory      │  │  CPU Cycles │  │  Encryption     │  │
-│  │ Allocation  │  │  Consumption│  │   Processing    │  │
-│  └─────────────┘  └─────────────┘  └─────────────────┘  │
-└─────────────────────────────────────────────────────────┘
 ```
 
-## Physics Implementation
+## 🔬 Physics Implementation
 
 ### Ternary Fission Modeling
 
-The system simulates ternary fission events where a heavy nucleus (typically U-235) splits into three fragments:
+Simulates U-235 splitting into three fragments:
+- **Light Fragment** (~95 AMU, ~30% kinetic energy)
+- **Heavy Fragment** (~140 AMU, ~67% kinetic energy)  
+- **Alpha Particle** (4 AMU, ~3% kinetic energy)
 
-1. **Light Fragment** (~95 AMU, ~30% of kinetic energy)
-2. **Heavy Fragment** (~140 AMU, ~67% of kinetic energy)  
-3. **Alpha Particle** (4 AMU, ~3% of kinetic energy)
-
-**Energy Conservation**: Q = (M_parent - M_fragment1 - M_fragment2 - M_fragment3) × c²
-
-**Momentum Conservation**: Σp_initial = Σp_final (vector sum in 3D space)
+**Conservation Laws:**
+- Energy: Q = (M_parent - ΣM_fragments) × c²
+- Momentum: Σp_initial = Σp_final (3D vector sum)
 
 ### Energy Field Representation
 
-Energy fields are represented through computational resource consumption:
-
 - **Memory Mapping**: 1 MeV = 1 MB allocated memory
-- **CPU Cycle Mapping**: 1 MeV = 1 billion CPU cycles consumed
-- **Entropy Calculation**: S = k × ln(W) where W represents system microstates
+- **CPU Mapping**: 1 MeV = 1 billion CPU cycles
+- **Entropy**: S = k × ln(W) using system microstates
+- **Dissipation**: E(t) = E₀ × e^(-λt) via encryption rounds
 
-### Energy Dissipation Model
-
-Energy dissipation is simulated through encryption rounds:
-
-```
-E(t) = E₀ × e^(-λt)
-```
-
-Where:
-- E₀ = Initial energy
-- λ = Dissipation constant (0.01 per encryption round)
-- t = Number of encryption rounds completed
-
-## Installation and Setup
+## 📦 Installation
 
 ### Prerequisites
 
-**System Requirements:**
-- Debian 12 or Ubuntu 24 LTS
-- 8+ GB RAM (for large energy field simulations)
-- 4+ CPU cores (recommended for concurrent operations)
-- 20+ GB free disk space
-
-**Development Tools:**
+**Ubuntu 24.04 LTS:**
 ```bash
-# Install required packages (Debian 12)
-sudo apt update && sudo apt upgrade -y
-sudo apt install build-essential gcc g++ gdb make cmake
-sudo apt install libgsl-dev libeigen3-dev libfftw3-dev
-sudo apt install libssl-dev libcrypto++-dev
-sudo apt install git docker.io docker-compose
+sudo apt update && sudo apt install -y \
+  build-essential gcc g++ cmake make \
+  libssl-dev libcrypto++-dev \
+  git docker.io docker-compose
+```
 
-# Install Go 1.23.3+ (manual installation)
+**Go 1.23+:**
+```bash
 wget https://go.dev/dl/go1.23.3.linux-amd64.tar.gz
 sudo tar -C /usr/local -xzf go1.23.3.linux-amd64.tar.gz
 export PATH=/usr/local/go/bin:$PATH
 ```
 
-### Quick Start
+### Build from Source
 
-1. **Clone and Build:**
 ```bash
-git clone <repository-url>
-cd ternary-fission-emulator
-make dev-setup  # Set up development environment
+git clone https://github.com/davestj/ternary-fission-reactor.git
+cd ternary-fission-reactor
+make dev-setup  # Initialize environment  
 make all        # Build all components
+make test       # Run test suite
 ```
 
-2. **Run the System:**
+### Docker Deployment
+
 ```bash
-# Start the complete stack
+make docker-build
 make docker-run
-
-# Or run components separately
-make dev-run    # Development mode
 ```
 
-3. **Verify Installation:**
-```bash
-# Check system status
-curl http://localhost:8080/api/v1/health
-curl http://localhost:8080/api/v1/status
-```
+## 🚀 Usage Examples
 
-## Usage Examples
+### Energy Field Creation
 
-### Creating Energy Fields
-
-**Create a 50 MeV energy field:**
 ```bash
 curl -X POST http://localhost:8080/api/v1/energy-fields \
   -H "Content-Type: application/json" \
   -d '{
     "initial_energy_mev": 50.0,
-    "field_name": "test_field_1",
     "auto_dissipate": true,
     "dissipation_rounds": 10
   }'
 ```
 
-**Response:**
-```json
-{
-  "field_id": "field_1_1722276000",
-  "initial_energy_mev": 50.0,
-  "current_energy_mev": 50.0,
-  "memory_allocated_bytes": 52428800,
-  "cpu_cycles_consumed": 50000000000,
-  "status": "active",
-  "created_at": "2025-07-29T14:30:00Z"
-}
-```
+### Ternary Fission Simulation
 
-### Simulating Ternary Fission Events
-
-**Single fission event:**
 ```bash
 curl -X POST http://localhost:8080/api/v1/simulate/fission \
   -H "Content-Type: application/json" \
@@ -188,367 +168,103 @@ curl -X POST http://localhost:8080/api/v1/simulate/fission \
   }'
 ```
 
-**Continuous simulation:**
-```bash
-curl -X POST http://localhost:8080/api/v1/simulate/continuous \
-  -H "Content-Type: application/json" \
-  -d '{
-    "events_per_second": 2.0,
-    "parent_mass": 235.0,
-    "excitation_energy": 6.5
-  }'
-```
-
-### Energy Field Dissipation
-
-**Dissipate energy through encryption rounds:**
-```bash
-curl -X POST http://localhost:8080/api/v1/energy-fields/field_1_1722276000/dissipate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "encryption_rounds": 25
-  }'
-```
-
 ### Real-Time Monitoring
 
-**WebSocket connection for live updates:**
 ```javascript
 const ws = new WebSocket('ws://localhost:8080/api/v1/ws/monitor');
-
-ws.onmessage = function(event) {
+ws.onmessage = (event) => {
   const data = JSON.parse(event.data);
-  if (data.type === 'field_update') {
-    console.log('Energy field updated:', data.data);
-  }
+  console.log('Energy field update:', data);
 };
 ```
 
-### System Status Monitoring
-
-**Get comprehensive system status:**
-```bash
-curl http://localhost:8080/api/v1/status
-```
-
-**Prometheus metrics:**
-```bash
-curl http://localhost:8080/api/v1/metrics
-```
-
-## API Reference
-
-### Energy Field Management
+## 📋 API Reference
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/v1/energy-fields` | POST | Create new energy field |
-| `/api/v1/energy-fields` | GET | List all energy fields |
-| `/api/v1/energy-fields/{id}` | GET | Get specific energy field |
-| `/api/v1/energy-fields/{id}/dissipate` | POST | Dissipate energy field |
-| `/api/v1/energy-fields/{id}` | DELETE | Delete energy field |
-
-### Simulation Control
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
+| `/api/v1/energy-fields` | POST | Create energy field |
+| `/api/v1/energy-fields` | GET | List all fields |
+| `/api/v1/energy-fields/{id}` | GET | Get specific field |
+| `/api/v1/energy-fields/{id}/dissipate` | POST | Dissipate field |
 | `/api/v1/simulate/fission` | POST | Simulate fission events |
-| `/api/v1/simulate/continuous` | POST | Start continuous simulation |
-| `/api/v1/simulate/continuous` | DELETE | Stop continuous simulation |
-
-### System Monitoring
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/v1/status` | GET | System status and metrics |
-| `/api/v1/health` | GET | Health check endpoint |
+| `/api/v1/status` | GET | System status |
+| `/api/v1/health` | GET | Health check |
 | `/api/v1/metrics` | GET | Prometheus metrics |
-| `/api/v1/ws/monitor` | WebSocket | Real-time monitoring |
 
-## Performance Optimization
+## 🧪 Testing & Quality
 
-### C++ Engine Optimization
-
-**Compiler Flags Used:**
 ```bash
-# Release build
--O3 -march=native -flto -DNDEBUG
-
-# Profile-guided optimization
--fprofile-generate  # First pass
--fprofile-use       # Second pass
+make test-cpp       # C++ unit tests
+make test-go        # Go tests  
+make benchmark      # Performance tests
+make analyze-cpp    # Static analysis
+make security-scan  # Security scanning
 ```
 
-**Memory Management:**
-- Custom allocators for energy field management
-- Memory pool allocation for frequent operations
-- RAII patterns for automatic resource cleanup
+**Performance Targets:**
+- 1000+ fission events/second (8-core system)
+- <100MB per 1000 energy fields
+- <50ms API response time
+- 60fps WebSocket updates
 
-### Go API Performance
+## 🐳 Docker Configuration
 
-**Concurrent Processing:**
-- Goroutines for handling multiple energy field operations
-- Channel-based communication between components
-- Connection pooling for database operations
-
-**Memory Optimization:**
-- Object pooling for frequently created structs
-- Efficient JSON serialization with streaming
-- Memory profiling with pprof integration
-
-## Testing and Quality Assurance
-
-### Unit Testing
-
-**C++ Tests:**
-```bash
-make test-cpp       # Run C++ unit tests with GoogleTest
-```
-
-**Go Tests:**
-```bash
-make test-go        # Run Go tests with coverage reporting
-```
-
-### Integration Testing
-
-**Full System Tests:**
-```bash
-make test-integration
-```
-
-### Performance Benchmarking
-
-**Physics Simulation Benchmarks:**
-```bash
-make benchmark      # Run performance benchmarks
-```
-
-**Memory Usage Analysis:**
-```bash
-make profile        # Generate performance profiles
-```
-
-### Code Quality
-
-**Static Analysis:**
-```bash
-make analyze-cpp    # C++ static analysis with cppcheck
-make analyze-go     # Go static analysis with vet/staticcheck
-make security-scan  # Security vulnerability scanning
-```
-
-## Deployment
-
-### Docker Deployment
-
-**Build Container Images:**
-```bash
-make docker-build
-```
-
-**Run with Docker Compose:**
-```bash
-make docker-run
-```
-
-**Production Docker Compose:**
 ```yaml
 version: '3.8'
 services:
-  api-server:
-    image: ternary-fission-emulator:latest
+  ternary-fission:
+    image: ternary-fission:latest
     ports:
       - "8080:8080"
     environment:
       - GO_ENV=production
-      - LOG_LEVEL=info
     volumes:
       - ./configs:/app/configs
-    restart: unless-stopped
-    
-  monitoring:
-    image: prom/prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
 ```
 
-### System Installation
+## 🛠️ Development
 
-**Install system-wide:**
-```bash
-sudo make install
-```
-
-**Configuration files location:** `/etc/ternary-fission/`
-
-**Log files location:** `/var/log/ternary-fission/`
-
-## Monitoring and Logging
-
-### Metrics Collection
-
-The system provides comprehensive metrics through Prometheus:
-
-- **Physics Metrics:** Energy simulation rates, fission event counts
-- **Performance Metrics:** CPU usage, memory consumption, response times
-- **System Metrics:** API request rates, error rates, connection counts
-
-### Real-Time Dashboards
-
-**Grafana Dashboard Configuration:**
-```json
-{
-  "dashboard": {
-    "title": "Ternary Fission Energy Monitoring",
-    "panels": [
-      {
-        "title": "Active Energy Fields",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "ternary_fission_active_energy_fields"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-### Log Analysis
-
-**Structured Logging Format:**
-```json
-{
-  "timestamp": "2025-07-29T14:30:00Z",
-  "level": "INFO", 
-  "component": "simulation_engine",
-  "event": "fission_event_simulated",
-  "data": {
-    "q_value_mev": 206.3,
-    "total_ke_mev": 165.0,
-    "computation_time_us": 125
-  }
-}
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**1. Go Version Compatibility:**
-```bash
-# Ensure Go 1.23+ is installed
-go version
-# Should show: go version go1.23.3 linux/amd64
-```
-
-**2. Memory Allocation Errors:**
-```bash
-# Check available memory
-free -h
-# Reduce energy field sizes if memory limited
-```
-
-**3. OpenSSL Library Issues:**
-```bash
-# Install development libraries
-sudo apt install libssl-dev libcrypto++-dev
-```
-
-**4. Port Conflicts:**
-```bash
-# Check port 8080 availability
-sudo netstat -tlnp | grep :8080
-```
-
-### Performance Tuning
-
-**System Parameters:**
-```bash
-# Increase file descriptor limit
-ulimit -n 65536
-
-# Optimize memory allocation
-echo 'vm.swappiness=10' >> /etc/sysctl.conf
-
-# CPU governor for performance
-echo performance > /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
-```
-
-## Development Guidelines
-
-### Code Style
-
-**C++ Standards:**
-- C++17 standard compliance
-- Google C++ Style Guide adherence
-- Comprehensive Doxygen documentation
-- RAII and smart pointer usage
-
-**Go Standards:**  
-- Effective Go guidelines
-- Standard library preference
-- Clear error handling
-- Comprehensive test coverage
+### Code Standards
+- **C++17** with GCC 13+ compatibility
+- **Go 1.23+** with effective Go guidelines
+- Production-grade error handling
+- Comprehensive documentation
 
 ### Contributing
+1. Fork repository
+2. Create feature branch: `git checkout -b feature/name`
+3. Make changes and test: `make test`
+4. Submit pull request
 
-1. **Fork the repository**
-2. **Create feature branch:** `git checkout -b feature/amazing-feature`
-3. **Commit changes:** `git commit -m 'Add amazing feature'`
-4. **Run tests:** `make test`
-5. **Push to branch:** `git push origin feature/amazing-feature`
-6. **Open Pull Request**
+## 📈 Monitoring
 
-### Development Workflow
+**Prometheus Metrics:**
+- `ternary_fission_active_energy_fields`
+- `ternary_fission_api_requests_total`
+- `ternary_fission_response_time_seconds`
 
-```bash
-# Set up development environment
-make dev-setup
+**Grafana Dashboard:** Available in `/monitoring/grafana/`
 
-# Start development mode
-make dev-run
+## 🔧 Troubleshooting
 
-# Run tests continuously
-make test
+**Common Issues:**
+- Port conflicts: Use `-port` flag to change port
+- Memory errors: Check available RAM with `free -h`
+- SSL errors: Install `libssl-dev libcrypto++-dev`
 
-# Code quality checks
-make format analyze-cpp analyze-go
+## 📄 License
 
-# Performance profiling
-make profile
-```
+MIT License - see [LICENSE](LICENSE) file.
 
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
-
-## Support and Contact
+## 🤝 Support & Contact
 
 **Author:** bthlops (David StJ)  
 **Email:** davestj@gmail.com  
-**GitHub:** https://github.com/davestj  
-**Profile:** https://www.davidstj.com
+**GitHub:** [@davestj](https://github.com/davestj)  
+**Profile:** [davidstj.com](https://www.davidstj.com)
 
-For technical support, please open an issue on the GitHub repository or contact the development team.
-
-## Acknowledgments
-
-- Physics simulation algorithms based on established nuclear physics literature
-- Energy field mapping concept inspired by computational thermodynamics
-- Performance optimization techniques from high-performance computing research
-- Real-time monitoring implementation using modern observability practices
+[![GitHub issues](https://img.shields.io/github/issues/davestj/ternary-fission-reactor)](https://github.com/davestj/ternary-fussion-reactor/issues/new)
 
 ---
 
-**Carry-over Context for Further Development:**
-
-- **Next Steps:** Integration with machine learning models for predictive energy field behavior
-- **Scalability:** Kubernetes deployment configuration for distributed simulation clusters  
-- **Accuracy:** Integration with experimental nuclear data validation frameworks
-- **Visualization:** 3D energy field visualization using WebGL/Three.js integration
-- **Security:** Enhanced authentication and authorization for production deployments
+> **"Advanced nuclear physics simulation meeting production engineering standards"**
