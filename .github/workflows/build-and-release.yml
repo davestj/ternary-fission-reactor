@@ -24,11 +24,11 @@ name: Build and Release
 
 on:
   push:
-    branches: [  dev ]
+    branches: [ master, main, develop ]
     tags:
       - 'v*'
   pull_request:
-    branches: [ master ]
+    branches: [ master, main ]
   workflow_dispatch:
     inputs:
       release_type:
@@ -314,9 +314,9 @@ jobs:
         Platform: Ubuntu 24.04 x86_64
         EOF
         
-        # We create checksums
+        # We create checksums for files only
         cd artifacts/${{ needs.version.outputs.version }}
-        sha256sum * > SHA256SUMS
+        find . -type f -name "*" -not -name "SHA256SUMS" -exec sha256sum {} \; > SHA256SUMS
         cd ../../
         
     - name: Upload build artifacts
