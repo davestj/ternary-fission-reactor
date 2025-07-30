@@ -24,11 +24,11 @@ name: Build and Release
 
 on:
   push:
-    branches: [ master, main, develop ]
+    branches: [  dev ]
     tags:
       - 'v*'
   pull_request:
-    branches: [ master, main ]
+    branches: [ master ]
   workflow_dispatch:
     inputs:
       release_type:
