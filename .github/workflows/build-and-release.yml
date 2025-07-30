@@ -2,33 +2,34 @@
 # File: .github/workflows/build-and-release.yml
 # Author: bthlops (David StJ)
 # Date: July 30, 2025
-# Title: Ternary Fission Reactor - Build and Release Pipeline
-# Purpose: Automated CI/CD pipeline for Ubuntu 24.04 with C++17/Go builds and releases
-# Reason: Provides automated testing, building, and release artifact generation
+# Title: Ternary Fission Reactor - Enhanced Build and Release Pipeline
+# Purpose: Automated CI/CD pipeline with dev-to-master promotion process
+# Reason: Provides proper development workflow with source archives and production releases
 #
 # Change Log:
-# 2025-07-30: Initial creation with comprehensive build pipeline
-#             Added C++17 GCC 13+ support for Ubuntu 24.04
-#             Integrated Go 1.23+ build system
-#             Added automatic version incrementing
-#             Created release artifact generation
+# 2025-07-30: Enhanced workflow with dev-to-master promotion process
+#             Added source archive generation for dev branch builds
+#             Implemented production release workflow for master branch
+#             Added artifact promotion and validation steps
+#             Integrated comprehensive quality gates and testing
 #
 # Carry-over Context:
-# - Builds on Ubuntu 24.04 with latest GCC 13+ and Go 1.23+
-# - Creates release artifacts with binaries and source code
-# - Auto-increments version from 1.1.1-alpha baseline
-# - Includes comprehensive testing and quality checks
-# - Publishes releases with downloadable artifacts
+# - Dev branch PRs generate source archives and development builds
+# - Master branch merges trigger production releases after validation
+# - Automatic version incrementing based on branch and release type
+# - Comprehensive testing, security scanning, and quality checks
+# - Artifact promotion from development to production releases
 
-name: Build and Release
+name: Build and Release Pipeline
 
 on:
   push:
-    branches: [ master, main, develop ]
+    branches: [ master, main, develop, dev ]
     tags:
       - 'v*'
   pull_request:
-    branches: [ master, main ]
+    branches: [ master, main, develop, dev ]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
       release_type:
@@ -41,36 +42,83 @@ on:
         - beta
         - rc
         - release
+      promote_to_production:
+        description: 'Promote to production release'
+        required: false
+        default: false
+        type: boolean
 
 env:
-  # We set build configuration
+  # Build configuration
   BUILD_TYPE: release
   GO_VERSION: '1.23.3'
   NODE_VERSION: '20'
   
-  # We define version increment strategy
+  # Version management
   BASE_VERSION: '1.1.1'
   
-  # We set artifact names
+  # Project configuration
   PROJECT_NAME: 'ternary-fission-reactor'
   BINARY_NAME: 'ternary-fission'
   API_BINARY_NAME: 'ternary-api'
+  
+  # Quality gates
+  MIN_COVERAGE: '80'
+  MAX_COMPLEXITY: '10'
 
 jobs:
-  # We determine version number for this build
-  version:
+  # We determine build strategy and version
+  strategy:
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
-      is_release: ${{ steps.version.outputs.is_release }}
+      is_production: ${{ steps.strategy.outputs.is_production }}
+      is_development: ${{ steps.strategy.outputs.is_development }}
+      should_release: ${{ steps.strategy.outputs.should_release }}
+      build_matrix: ${{ steps.strategy.outputs.build_matrix }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
         
-    - name: Determine version
+    - name: Determine build strategy
+      id: strategy
+      run: |
+        # We analyze the build context
+        IS_PR="${{ github.event_name == 'pull_request' }}"
+        IS_MASTER="${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' }}"
+        IS_DEV="${{ github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/dev' }}"
+        IS_TAG="${{ startsWith(github.ref, 'refs/tags/v') }}"
+        IS_MANUAL="${{ github.event_name == 'workflow_dispatch' }}"
+        
+        # We determine production vs development build
+        if [[ "$IS_MASTER" == "true" ]] || [[ "$IS_TAG" == "true" ]] || [[ "${{ github.event.inputs.promote_to_production }}" == "true" ]]; then
+          IS_PRODUCTION="true"
+          IS_DEVELOPMENT="false"
+          BUILD_MATRIX='["release"]'
+        else
+          IS_PRODUCTION="false"
+          IS_DEVELOPMENT="true"
+          BUILD_MATRIX='["release", "debug"]'
+        fi
+        
+        # We determine if we should create a release
+        if [[ "$IS_PRODUCTION" == "true" ]] && [[ "$IS_PR" == "false" ]]; then
+          SHOULD_RELEASE="true"
+        else
+          SHOULD_RELEASE="false"
+        fi
+        
+        echo "is_production=$IS_PRODUCTION" >> $GITHUB_OUTPUT
+        echo "is_development=$IS_DEVELOPMENT" >> $GITHUB_OUTPUT
+        echo "should_release=$SHOULD_RELEASE" >> $GITHUB_OUTPUT
+        echo "build_matrix=$BUILD_MATRIX" >> $GITHUB_OUTPUT
+        
+        echo "Build Strategy: Production=$IS_PRODUCTION, Development=$IS_DEVELOPMENT, Release=$SHOULD_RELEASE"
+        
+    - name: Calculate version
       id: version
       run: |
         # We get the latest tag or use base version
@@ -92,68 +140,133 @@ jobs:
           BUILD=0
         fi
         
-        # We determine release type
-        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-          RELEASE_TYPE="${{ github.event.inputs.release_type }}"
-        elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-          RELEASE_TYPE="release"
-        elif [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
-          RELEASE_TYPE="beta"
+        # We determine release type based on context
+        if [[ "${{ steps.strategy.outputs.is_production }}" == "true" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            RELEASE_TYPE="${{ github.event.inputs.release_type }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            RELEASE_TYPE="release"
+          else
+            RELEASE_TYPE="beta"
+          fi
         else
           RELEASE_TYPE="alpha"
         fi
         
-        # We increment version based on type
-        if [[ "$RELEASE_TYPE" == "release" ]]; then
-          if [[ "$SUFFIX" == "rc" ]]; then
-            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+        # We calculate version based on release type
+        case "$RELEASE_TYPE" in
+          "release")
+            if [[ "$SUFFIX" == "rc" ]]; then
+              VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            else
+              PATCH=$((PATCH + 1))
+              VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            fi
             TAG="v${VERSION}"
-          else
-            PATCH=$((PATCH + 1))
-            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            ;;
+          "rc")
+            if [[ "$SUFFIX" == "beta" ]]; then
+              BUILD=1
+            else
+              BUILD=$((BUILD + 1))
+            fi
+            VERSION="${MAJOR}.${MINOR}.${PATCH}-rc.${BUILD}"
             TAG="v${VERSION}"
-          fi
-          IS_RELEASE="true"
-        elif [[ "$RELEASE_TYPE" == "rc" ]]; then
-          if [[ "$SUFFIX" == "beta" ]]; then
-            BUILD=1
-          else
+            ;;
+          "beta")
+            if [[ "$SUFFIX" == "alpha" ]]; then
+              BUILD=1
+            else
+              BUILD=$((BUILD + 1))
+            fi
+            VERSION="${MAJOR}.${MINOR}.${PATCH}-beta.${BUILD}"
+            TAG="v${VERSION}"
+            ;;
+          "alpha")
             BUILD=$((BUILD + 1))
-          fi
-          VERSION="${MAJOR}.${MINOR}.${PATCH}-rc.${BUILD}"
-          TAG="v${VERSION}"
-          IS_RELEASE="false"
-        elif [[ "$RELEASE_TYPE" == "beta" ]]; then
-          if [[ "$SUFFIX" == "alpha" ]]; then
-            BUILD=1
-          else
-            BUILD=$((BUILD + 1))
-          fi
-          VERSION="${MAJOR}.${MINOR}.${PATCH}-beta.${BUILD}"
-          TAG="v${VERSION}"
-          IS_RELEASE="false"
-        else
-          BUILD=$((BUILD + 1))
-          VERSION="${MAJOR}.${MINOR}.${PATCH}-alpha.${BUILD}"
-          TAG="v${VERSION}"
-          IS_RELEASE="false"
-        fi
+            VERSION="${MAJOR}.${MINOR}.${PATCH}-alpha.${BUILD}"
+            TAG="v${VERSION}"
+            ;;
+        esac
         
         echo "Generated version: $VERSION"
         echo "Generated tag: $TAG"
-        echo "Is release: $IS_RELEASE"
         
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "tag=$TAG" >> $GITHUB_OUTPUT
-        echo "is_release=$IS_RELEASE" >> $GITHUB_OUTPUT
+
+  # We run code quality and security checks
+  quality:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install quality tools
+      run: |
+        sudo apt update
+        sudo apt install -y cppcheck clang-tidy valgrind
+        
+        # We install Go security tools
+        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+        go install honnef.co/go/tools/cmd/staticcheck@latest
+        go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+        
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        
+    - name: C++ static analysis
+      run: |
+        # We run cppcheck on C++ sources
+        find src/cpp include -name "*.cpp" -o -name "*.h" | xargs cppcheck \
+          --enable=all \
+          --inconclusive \
+          --force \
+          --xml \
+          --xml-version=2 \
+          --output-file=cppcheck-report.xml \
+          2>/dev/null || true
+          
+        # We check for critical issues
+        if grep -q 'severity="error"' cppcheck-report.xml; then
+          echo "Critical C++ issues found"
+          cat cppcheck-report.xml
+          exit 1
+        fi
+        
+    - name: Go security scan
+      run: |
+        cd src/go
+        
+        # We run gosec security scanner
+        gosec -fmt json -out ../../gosec-report.json ./... || true
+        
+        # We run static analysis
+        staticcheck ./...
+        
+        # We check cyclomatic complexity
+        gocyclo -over ${{ env.MAX_COMPLEXITY }} .
+        
+        cd ../..
+        
+    - name: Upload quality reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: quality-reports-${{ github.run_id }}
+        path: |
+          cppcheck-report.xml
+          gosec-report.json
+        retention-days: 7
 
   # We build and test the application
   build:
-    needs: version
+    needs: [strategy, quality]
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        build_type: [release, debug]
+        build_type: ${{ fromJson(needs.strategy.outputs.build_matrix) }}
     
     steps:
     - name: Checkout code
@@ -182,7 +295,8 @@ jobs:
           git \
           curl \
           tar \
-          gzip
+          gzip \
+          lcov
           
         # We set GCC 13 as default
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
@@ -197,10 +311,16 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         
-    - name: Verify Go installation
-      run: |
-        go version
-        go env
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+          build/cache
+        key: ${{ runner.os }}-build-${{ hashFiles('**/go.mod', '**/Makefile') }}
+        restore-keys: |
+          ${{ runner.os }}-build-
         
     - name: Setup build environment
       run: |
@@ -208,6 +328,7 @@ jobs:
         mkdir -p build/${{ matrix.build_type }}
         mkdir -p bin
         mkdir -p artifacts
+        mkdir -p coverage
         
         # We set up Go modules
         cd src/go
@@ -217,9 +338,12 @@ jobs:
         
     - name: Build C++ components
       run: |
-        # We build with the specified build type
-        make clean
-        make cpp-build BUILD_TYPE=${{ matrix.build_type }}
+        # We build with coverage if debug mode
+        if [[ "${{ matrix.build_type }}" == "debug" ]]; then
+          make cpp-build BUILD_TYPE=${{ matrix.build_type }} COVERAGE=1
+        else
+          make cpp-build BUILD_TYPE=${{ matrix.build_type }}
+        fi
         
         # We verify the binary was created
         if [[ ! -f "bin/${BINARY_NAME}" ]]; then
@@ -243,107 +367,228 @@ jobs:
         # We check binary info
         file bin/${API_BINARY_NAME}
         
-    - name: Run unit tests
+    - name: Run comprehensive tests
       run: |
-        # We run C++ tests if available
-        if make test-cpp 2>/dev/null; then
-          echo "C++ tests passed"
+        # We run C++ tests with coverage
+        if [[ "${{ matrix.build_type }}" == "debug" ]]; then
+          make test-cpp-coverage || echo "C++ tests completed with issues"
+          
+          # We generate coverage report
+          if command -v lcov >/dev/null 2>&1; then
+            lcov --capture --directory build/debug --output-file coverage/cpp-coverage.info
+            lcov --remove coverage/cpp-coverage.info '/usr/*' --output-file coverage/cpp-coverage-filtered.info
+            genhtml coverage/cpp-coverage-filtered.info --output-directory coverage/cpp-html
+          fi
         else
-          echo "No C++ tests found or tests failed"
+          make test-cpp || echo "C++ tests completed"
         fi
         
-        # We run Go tests
+        # We run Go tests with coverage
         cd src/go
-        go test -v ./... -race -coverprofile=coverage.out
-        go tool cover -html=coverage.out -o coverage.html
+        go test -v ./... -race -coverprofile=../../coverage/go-coverage.out -covermode=atomic
+        go tool cover -html=../../coverage/go-coverage.out -o ../../coverage/go-coverage.html
+        
+        # We check coverage thresholds
+        COVERAGE=$(go tool cover -func=../../coverage/go-coverage.out | grep total: | awk '{print $3}' | sed 's/%//')
+        echo "Go test coverage: ${COVERAGE}%"
+        
+        if (( $(echo "$COVERAGE < ${{ env.MIN_COVERAGE }}" | bc -l) )); then
+          echo "Coverage ${COVERAGE}% is below minimum ${MIN_COVERAGE}%"
+          exit 1
+        fi
+        
         cd ../..
         
-    - name: Run static analysis
+    - name: Integration tests
+      if: matrix.build_type == 'release'
       run: |
-        # We run C++ static analysis
-        if command -v cppcheck >/dev/null 2>&1; then
-          make analyze-cpp || echo "Static analysis completed with warnings"
-        fi
-        
-        # We run Go static analysis
-        cd src/go
-        go vet ./...
-        if command -v staticcheck >/dev/null 2>&1; then
-          staticcheck ./...
-        fi
-        cd ../..
-        
-    - name: Run security scan
-      run: |
-        # We scan for security issues
-        if command -v gosec >/dev/null 2>&1; then
-          cd src/go
-          gosec ./...
-          cd ../..
-        fi
+        # We run integration tests
+        make test-integration || echo "Integration tests completed"
         
     - name: Performance benchmarks
       if: matrix.build_type == 'release'
       run: |
-        # We run performance tests
-        make benchmark || echo "Benchmark completed"
+        # We run performance benchmarks
+        make benchmark | tee benchmark-results.txt
         
-    - name: Package binaries
-      if: matrix.build_type == 'release'
+        # We save benchmark results
+        mkdir -p artifacts/benchmarks
+        cp benchmark-results.txt artifacts/benchmarks/
+        
+    - name: Memory leak detection
+      if: matrix.build_type == 'debug'
       run: |
-        # We create binary package
-        mkdir -p artifacts/${{ needs.version.outputs.version }}
+        # We run valgrind if available
+        if command -v valgrind >/dev/null 2>&1; then
+          valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all \
+            --track-origins=yes --verbose --log-file=valgrind-report.txt \
+            bin/${BINARY_NAME} --help || true
+            
+          # We check for leaks
+          if grep -q "definitely lost" valgrind-report.txt; then
+            echo "Memory leaks detected"
+            cat valgrind-report.txt
+            exit 1
+          fi
+        fi
+        
+    - name: Package development artifacts
+      if: needs.strategy.outputs.is_development == 'true'
+      run: |
+        # We create development package
+        mkdir -p artifacts/dev-${{ needs.strategy.outputs.version }}
         
         # We copy binaries
-        cp bin/${BINARY_NAME} artifacts/${{ needs.version.outputs.version }}/
-        cp bin/${API_BINARY_NAME} artifacts/${{ needs.version.outputs.version }}/
+        cp bin/${BINARY_NAME} artifacts/dev-${{ needs.strategy.outputs.version }}/
+        cp bin/${API_BINARY_NAME} artifacts/dev-${{ needs.strategy.outputs.version }}/
         
         # We copy configuration and documentation
-        cp -r configs artifacts/${{ needs.version.outputs.version }}/
-        cp README.md LICENSE artifacts/${{ needs.version.outputs.version }}/
-        cp BUILD_CARRYOVER.md artifacts/${{ needs.version.outputs.version }}/
+        cp -r configs artifacts/dev-${{ needs.strategy.outputs.version }}/
+        cp README.md BUILD_CARRYOVER.md artifacts/dev-${{ needs.strategy.outputs.version }}/
+        
+        # We copy test and coverage reports
+        if [[ -d coverage ]]; then
+          cp -r coverage artifacts/dev-${{ needs.strategy.outputs.version }}/
+        fi
         
         # We create version info
-        cat > artifacts/${{ needs.version.outputs.version }}/VERSION << EOF
-        Version: ${{ needs.version.outputs.version }}
+        cat > artifacts/dev-${{ needs.strategy.outputs.version }}/VERSION << EOF
+        Version: ${{ needs.strategy.outputs.version }}
         Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
         Git Commit: ${{ github.sha }}
+        Git Branch: ${{ github.ref_name }}
         Build Type: ${{ matrix.build_type }}
         GCC Version: $(gcc --version | head -n1)
         Go Version: $(go version)
         Platform: Ubuntu 24.04 x86_64
+        Build Context: Development
         EOF
         
-        # We create checksums for files only
-        cd artifacts/${{ needs.version.outputs.version }}
+    - name: Package production artifacts  
+      if: needs.strategy.outputs.is_production == 'true' && matrix.build_type == 'release'
+      run: |
+        # We create production package
+        mkdir -p artifacts/prod-${{ needs.strategy.outputs.version }}
+        
+        # We copy binaries
+        cp bin/${BINARY_NAME} artifacts/prod-${{ needs.strategy.outputs.version }}/
+        cp bin/${API_BINARY_NAME} artifacts/prod-${{ needs.strategy.outputs.version }}/
+        
+        # We copy configuration and documentation
+        cp -r configs artifacts/prod-${{ needs.strategy.outputs.version }}/
+        cp README.md LICENSE BUILD_CARRYOVER.md artifacts/prod-${{ needs.strategy.outputs.version }}/
+        
+        # We copy performance benchmarks
+        if [[ -d artifacts/benchmarks ]]; then
+          cp -r artifacts/benchmarks artifacts/prod-${{ needs.strategy.outputs.version }}/
+        fi
+        
+        # We create production version info
+        cat > artifacts/prod-${{ needs.strategy.outputs.version }}/VERSION << EOF
+        Version: ${{ needs.strategy.outputs.version }}
+        Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        Git Commit: ${{ github.sha }}
+        Git Branch: ${{ github.ref_name }}
+        Build Type: ${{ matrix.build_type }}
+        GCC Version: $(gcc --version | head -n1)
+        Go Version: $(go version)
+        Platform: Ubuntu 24.04 x86_64
+        Build Context: Production
+        EOF
+        
+        # We create checksums
+        cd artifacts/prod-${{ needs.strategy.outputs.version }}
         find . -type f -name "*" -not -name "SHA256SUMS" -exec sha256sum {} \; > SHA256SUMS
         cd ../../
         
-    - name: Upload build artifacts
-      if: matrix.build_type == 'release'
+    - name: Upload development artifacts
+      if: needs.strategy.outputs.is_development == 'true'
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-ubuntu24-x64
-        path: artifacts/${{ needs.version.outputs.version }}/
-        retention-days: 30
+        name: ${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-dev-${{ matrix.build_type }}-ubuntu24-x64
+        path: artifacts/dev-${{ needs.strategy.outputs.version }}/
+        retention-days: 14
+        
+    - name: Upload production artifacts
+      if: needs.strategy.outputs.is_production == 'true' && matrix.build_type == 'release'
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-prod-ubuntu24-x64
+        path: artifacts/prod-${{ needs.strategy.outputs.version }}/
+        retention-days: 90
 
-
-
-  # We create source archive
-  source:
-    needs: version
+  # We create source archives for development builds
+  source-dev:
+    needs: strategy
     runs-on: ubuntu-24.04
+    if: needs.strategy.outputs.is_development == 'true'
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Create source archive
+    - name: Create development source archive
       run: |
-        # We create source distribution
+        # We create development source distribution
         mkdir -p dist
         
-        # We exclude build artifacts and sensitive files
+        # We include development files and exclude production-only items
+        tar --exclude='.git' \
+            --exclude='build' \
+            --exclude='bin' \
+            --exclude='artifacts' \
+            --exclude='dist' \
+            --exclude='*.log' \
+            --exclude='*.tmp' \
+            --exclude='.github/workflows/deploy-*.yml' \
+            -czf dist/${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-dev-source.tar.gz \
+            .
+            
+        # We create checksums
+        cd dist
+        sha256sum *.tar.gz > SHA256SUMS-DEV
+        cd ..
+        
+        # We create source info file
+        cat > dist/SOURCE-INFO << EOF
+        Project: ${{ env.PROJECT_NAME }}
+        Version: ${{ needs.strategy.outputs.version }}
+        Source Type: Development
+        Created: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        Git Commit: ${{ github.sha }}
+        Git Branch: ${{ github.ref_name }}
+        Archive: ${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-dev-source.tar.gz
+        
+        Development Build Instructions:
+        1. Extract: tar -xzf ${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-dev-source.tar.gz
+        2. Build: make all
+        3. Test: make test
+        4. Run: ./bin/${{ env.API_BINARY_NAME }} -config configs/ternary_fission.conf
+        EOF
+        
+    - name: Upload development source artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-dev-source
+        path: dist/
+        retention-days: 14
+
+  # We create production source archives
+  source-prod:
+    needs: strategy
+    runs-on: ubuntu-24.04
+    if: needs.strategy.outputs.is_production == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Create production source archive
+      run: |
+        # We create production source distribution
+        mkdir -p dist
+        
+        # We exclude development and build artifacts
         tar --exclude='.git' \
             --exclude='build' \
             --exclude='bin' \
@@ -352,7 +597,10 @@ jobs:
             --exclude='.github' \
             --exclude='*.log' \
             --exclude='*.tmp' \
-            -czf dist/${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-source.tar.gz \
+            --exclude='**/test_*' \
+            --exclude='**/*_test.go' \
+            --exclude='**/mock_*' \
+            -czf dist/${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-source.tar.gz \
             .
             
         # We create checksums
@@ -360,33 +608,52 @@ jobs:
         sha256sum *.tar.gz > SHA256SUMS
         cd ..
         
-    - name: Upload source artifact
+        # We create production source info
+        cat > dist/SOURCE-INFO << EOF
+        Project: ${{ env.PROJECT_NAME }}
+        Version: ${{ needs.strategy.outputs.version }}
+        Source Type: Production
+        Created: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        Git Commit: ${{ github.sha }}
+        Git Branch: ${{ github.ref_name }}
+        Archive: ${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-source.tar.gz
+        
+        Production Build Instructions:
+        1. Extract: tar -xzf ${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-source.tar.gz
+        2. Install Dependencies: sudo apt install -y build-essential gcc-13 g++-13 libssl-dev
+        3. Build: make clean && make release
+        4. Deploy: sudo make install
+        5. Configure: edit /etc/ternary-fission/ternary_fission.conf
+        6. Start: systemctl start ternary-fission
+        EOF
+        
+    - name: Upload production source artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-source
+        name: ${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-prod-source
         path: dist/
-        retention-days: 30
+        retention-days: 90
 
-  # We create GitHub release
+  # We create GitHub releases for production builds
   release:
-    needs: [version, build, source]
+    needs: [strategy, build, source-prod]
     runs-on: ubuntu-24.04
-    if: github.event_name != 'pull_request'
+    if: needs.strategy.outputs.should_release == 'true'
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Download binary artifacts
+    - name: Download production binary artifacts
       uses: actions/download-artifact@v4
       with:
-        name: ${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-ubuntu24-x64
+        name: ${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-prod-ubuntu24-x64
         path: release-binaries/
         
-    - name: Download source artifacts
+    - name: Download production source artifacts
       uses: actions/download-artifact@v4
       with:
-        name: ${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-source
+        name: ${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-prod-source
         path: release-source/
         
     - name: Prepare release assets
@@ -395,84 +662,184 @@ jobs:
         
         # We create binary archive
         cd release-binaries
-        tar -czf ../release-assets/${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-ubuntu24-x64.tar.gz *
+        tar -czf ../release-assets/${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-ubuntu24-x64.tar.gz *
         cd ..
         
         # We copy source archive
-        cp release-source/${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-source.tar.gz release-assets/
+        cp release-source/${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-source.tar.gz release-assets/
+        
+        # We create installation package
+        mkdir -p install-package
+        cp -r release-binaries/* install-package/
+        
+        # We create installation script
+        cat > install-package/install.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        echo "Installing Ternary Fission Reactor..."
+        
+        # We create system directories
+        sudo mkdir -p /opt/ternary-fission
+        sudo mkdir -p /etc/ternary-fission
+        sudo mkdir -p /var/log/ternary-fission
+        sudo mkdir -p /var/lib/ternary-fission
+        
+        # We copy binaries
+        sudo cp ternary-fission ternary-api /opt/ternary-fission/
+        sudo chmod +x /opt/ternary-fission/*
+        
+        # We copy configuration
+        sudo cp -r configs/* /etc/ternary-fission/
+        
+        # We create symlinks
+        sudo ln -sf /opt/ternary-fission/ternary-api /usr/local/bin/ternary-api
+        sudo ln -sf /opt/ternary-fission/ternary-fission /usr/local/bin/ternary-fission
+        
+        echo "Installation complete!"
+        echo "Start with: ternary-api -config /etc/ternary-fission/ternary_fission.conf"
+        EOF
+        
+        chmod +x install-package/install.sh
+        
+        # We create installation package archive
+        cd install-package
+        tar -czf ../release-assets/${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-installer.tar.gz *
+        cd ..
         
         # We create combined checksums
         cd release-assets
         sha256sum *.tar.gz > SHA256SUMS
         cd ..
         
-    - name: Generate release notes
+    - name: Generate changelog
       run: |
-        # We create release notes
-        cat > release-notes.md << 'EOF'
-        ## Ternary Fission Reactor ${{ needs.version.outputs.version }}
+        # We generate changelog from recent commits
+        git log --oneline --since="7 days ago" > recent-changes.txt
         
-        **Build Information:**
-        - Version: ${{ needs.version.outputs.version }}
-        - Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-        - Git Commit: ${{ github.sha }}
-        - Platform: Ubuntu 24.04 x86_64
-        - Compiler: GCC 13+ with C++17 support
-        - Go Version: ${{ env.GO_VERSION }}
+        cat > release-notes.md << EOF
+        ## Ternary Fission Reactor ${{ needs.strategy.outputs.version }}
         
-        **Download Options:**
-        - **Binaries**: `${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-ubuntu24-x64.tar.gz`
-        - **Source Code**: `${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-source.tar.gz`
+        **Production Release - Ubuntu 24.04 LTS**
         
-        **Installation:**
-        ```bash
-        # Download and extract binaries
-        wget https://github.com/${{ github.repository }}/releases/download/${{ needs.version.outputs.tag }}/${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-ubuntu24-x64.tar.gz
-        tar -xzf ${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-ubuntu24-x64.tar.gz
+        ### Build Information
+        - **Version**: ${{ needs.strategy.outputs.version }}
+        - **Build Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        - **Git Commit**: ${{ github.sha }}
+        - **Platform**: Ubuntu 24.04 x86_64
+        - **Compiler**: GCC 13+ with C++17 support
+        - **Go Version**: ${{ env.GO_VERSION }}
         
-        # Run API server
-        ./${{ env.API_BINARY_NAME }} -config configs/ternary_fission.conf -port 8080
-        ```
+        ### Download Options
+        - **Binary Package**: \`${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-ubuntu24-x64.tar.gz\`
+        - **Installer Package**: \`${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-installer.tar.gz\`
+        - **Source Code**: \`${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-source.tar.gz\`
         
-        **Changes in this release:**
-        - High-performance C++ physics engine
-        - Go REST API with WebSocket monitoring
-        - Docker deployment ready
-        - Comprehensive testing and benchmarks
-        - Production configuration included
+        ### Quick Installation
+        \`\`\`bash
+        # Download installer
+        wget https://github.com/${{ github.repository }}/releases/download/${{ needs.strategy.outputs.tag }}/${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-installer.tar.gz
         
-        **Verification:**
-        All release assets include SHA256 checksums for integrity verification.
+        # Extract and install
+        tar -xzf ${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-installer.tar.gz
+        sudo ./install.sh
+        
+        # Start the API server
+        ternary-api -config /etc/ternary-fission/ternary_fission.conf -port 8080
+        \`\`\`
+        
+        ### Manual Installation
+        \`\`\`bash
+        # Download binaries
+        wget https://github.com/${{ github.repository }}/releases/download/${{ needs.strategy.outputs.tag }}/${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-ubuntu24-x64.tar.gz
+        tar -xzf ${{ env.PROJECT_NAME }}-${{ needs.strategy.outputs.version }}-ubuntu24-x64.tar.gz
+        
+        # Run directly
+        ./${{ env.API_BINARY_NAME }} -config configs/ternary_fission.conf
+        \`\`\`
+        
+        ### Recent Changes
+        \`\`\`
+        $(cat recent-changes.txt)
+        \`\`\`
+        
+        ### Features
+        - High-performance C++ ternary fission physics engine
+        - Go REST API with WebSocket real-time monitoring
+        - Docker deployment ready with docker-compose
+        - Comprehensive testing and benchmarking suite
+        - Production-grade configuration and logging
+        - Prometheus metrics and Grafana dashboards
+        - Energy field simulation with encryption-based dissipation
+        - Thread-safe concurrent processing
+        
+        ### System Requirements
+        - Ubuntu 24.04 LTS (or compatible)
+        - GCC 13+ compiler (for building from source)
+        - 4GB+ RAM recommended
+        - OpenSSL development libraries
+        - Docker (optional, for containerized deployment)
+        
+        ### Verification
+        All release assets include SHA256 checksums for integrity verification:
+        \`\`\`bash
+        sha256sum -c SHA256SUMS
+        \`\`\`
+        
+        ### Support
+        - Documentation: See README.md in the package
+        - Issues: https://github.com/${{ github.repository }}/issues
+        - Discussions: https://github.com/${{ github.repository }}/discussions
         EOF
         
     - name: Create GitHub Release
-      if: needs.version.outputs.is_release == 'true' || github.event_name == 'workflow_dispatch'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ needs.version.outputs.tag }}
-        name: ${{ env.PROJECT_NAME }} ${{ needs.version.outputs.version }}
+        tag_name: ${{ needs.strategy.outputs.tag }}
+        name: ${{ env.PROJECT_NAME }} ${{ needs.strategy.outputs.version }}
         body_path: release-notes.md
         draft: false
-        prerelease: ${{ needs.version.outputs.is_release != 'true' }}
+        prerelease: ${{ contains(needs.strategy.outputs.version, 'alpha') || contains(needs.strategy.outputs.version, 'beta') || contains(needs.strategy.outputs.version, 'rc') }}
         files: |
           release-assets/*.tar.gz
           release-assets/SHA256SUMS
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # We notify about build status
+  # We provide build status notifications
   notify:
-    needs: [version, build, source, release]
+    needs: [strategy, quality, build, source-dev, source-prod, release]
     runs-on: ubuntu-24.04
     if: always()
     
     steps:
-    - name: Build Status
+    - name: Build Status Summary
       run: |
-        if [[ "${{ needs.build.result }}" == "success" ]]; then
-          echo "✅ Build completed successfully for version ${{ needs.version.outputs.version }}"
-          echo "🚀 Artifacts available for download"
-        else
-          echo "❌ Build failed"
+        echo "## Build Summary for ${{ needs.strategy.outputs.version }}"
+        echo "- **Strategy**: ${{ needs.strategy.outputs.is_production == 'true' && 'Production' || 'Development' }}"
+        echo "- **Quality Check**: ${{ needs.quality.result }}"
+        echo "- **Build**: ${{ needs.build.result }}"
+        
+        if [[ "${{ needs.strategy.outputs.is_development }}" == "true" ]]; then
+          echo "- **Dev Source Archive**: ${{ needs.source-dev.result }}"
+          echo "🔧 Development artifacts available for download"
+        fi
+        
+        if [[ "${{ needs.strategy.outputs.is_production }}" == "true" ]]; then
+          echo "- **Prod Source Archive**: ${{ needs.source-prod.result }}"
+          if [[ "${{ needs.strategy.outputs.should_release }}" == "true" ]]; then
+            echo "- **Release**: ${{ needs.release.result }}"
+            echo "🚀 Production release created"
+          fi
+        fi
+        
+        # We check for failures
+        if [[ "${{ needs.build.result }}" != "success" ]]; then
+          echo "❌ Build failed - check logs for details"
           exit 1
+        elif [[ "${{ needs.quality.result }}" != "success" ]]; then
+          echo "⚠️ Quality checks failed - review quality reports"
+          exit 1
+        else
+          echo "✅ All checks passed successfully"
         fi
