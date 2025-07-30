@@ -418,7 +418,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 **bthlops (David StJ)**
 - Email: davestj@gmail.com
 - GitHub: https://github.com/davestj
-- Profile: https://www.davidstj.com
+- Profile: https://www.davestj.com
 - ORCID: https://orcid.org/0009-0000-5077-9751
 
 ## 🎯 Roadmap
