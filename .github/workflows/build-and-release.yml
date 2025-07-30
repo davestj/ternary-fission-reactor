@@ -18,6 +18,10 @@ on:
     branches: [ master, main, develop, dev ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  packages: write
+
 env:
   PROJECT_NAME: 'ternary-fission-reactor'
   BINARY_NAME: 'ternary-fission'
