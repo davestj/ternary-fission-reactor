@@ -9,57 +9,86 @@
 
 **Author:** bthlops (David StJ)  
 **Version:** 1.1.15-alpha (Latest: [Releases](https://github.com/davestj/ternary-fission-reactor/releases))  
-**Last Updated:** July 30, 2025  
+**Last Updated:** July 31, 2025  
 **Repository:** https://github.com/davestj/ternary-fission-reactor
 
 High-performance ternary nuclear fission simulation with C++ physics engine, Go REST API, and Docker deployment. Maps nuclear energy to computational resources with real-time monitoring and conservation law verification using multi-base mathematical frameworks.
 
 ## 📊 Current Development Status (v1.1.15-alpha)
 
-### ✅ Working Components
-- **C++ Physics Engine**: Fully functional ternary fission simulation
-- **Multi-Base Mathematics**: Base-3, Base-5, Base-8, Base-17 implementations
-- **Conservation Laws**: Energy, momentum, mass, charge verification
-- **CLI Interface**: Complete command-line tool with all options
-- **Build System**: Automated CI/CD with GitHub Actions
-- **Cross-Platform**: Ubuntu 24.04/GCC 13+ compatibility
+### ✅ Fully Working Components
+- **C++ Physics Engine**: Fully functional ternary fission simulation with conservation law verification
+- **Go REST API Server**: **WORKING** - Compiles, runs, serves dashboard and API endpoints
+- **Docker Deployment**: **WORKING** - Multi-stage builds, proper health checks, graceful shutdown
+- **Docker Compose Stack**: **WORKING** - Tested with ARM64/AMD64 compatibility
+- **Web Dashboard**: **WORKING** - Immersive educational interface with project information
+- **Multi-Base Mathematics**: Base-3, Base-5, Base-8, Base-17 implementations complete
+- **CLI Interface**: Complete command-line tool with all options and interactive mode
+- **Build System**: Automated CI/CD with GitHub Actions, cross-platform compatibility
 
-### ⚠️ In Testing/Development
-- **Go REST API Server**: Compiles and runs, needs full regression testing
-- **WebSocket Monitoring**: Basic implementation, requires validation
-- **Energy Field Management**: Core functionality present, performance tuning needed
-- **Prometheus Metrics**: Integration implemented, monitoring validation pending
+### ✅ Operational Endpoints
+- **Web Dashboard**: `http://localhost:8080/` - Educational project interface
+- **Health Check**: `http://localhost:8080/api/v1/health` - System health monitoring
+- **API Status**: `http://localhost:8080/api/v1/status` - Real-time system metrics
+- **Prometheus Metrics**: `http://localhost:8080/api/v1/metrics` - Performance monitoring
+- **API Documentation**: `http://localhost:8080/api/v1/` - REST API reference
 
-### ❌ Known Issues/Non-Functional
-- **Docker Deployment**: Non-functional as of v1.1.15-alpha
-- **Kubernetes Integration**: Non-functional, requires container fixes
-- **Production Configuration**: Needs validation in enterprise environments
-- **Memory Pool Optimization**: Performance improvements needed
+### ⚠️ In Testing/Validation Phase
+- **WebSocket Monitoring**: Basic implementation, real-time validation ongoing
+- **Energy Field Management**: Core functionality present, comprehensive testing needed
+- **Cross-Platform Testing**: Ubuntu 24.04 verified, other distributions pending
+- **Performance Optimization**: Memory pool improvements and load testing required
 
-### 🎯 Release Roadmap
-- **v1.1.25**: Final alpha → **v1.2.1-beta** (Docker/Kubernetes functional)
-- **v1.2.100**: Beta completion → **v1.3.1** Gold Release
-- **Current Focus**: Docker containerization and API testing
+### 🎯 Updated Release Timeline
+- **v1.1.25**: Complete API testing → **v1.2.1-beta** (Full feature completion)
+- **v1.2.100**: Performance optimization → **v1.3.1** Gold Release
+- **Current Focus**: Comprehensive API testing and Kubernetes integration
 
-### 🔗 Official Links
-- **Repository**: https://github.com/davestj/ternary-fission-reactor
-- **Latest Releases**: https://github.com/davestj/ternary-fission-reactor/releases
-- **Issues/Feedback**: https://github.com/davestj/ternary-fission-reactor/issues
-- **Testing Encouraged**: Download, compile, test, report findings
+## 📚 Documentation Links
 
-### Development Build (dev/develop branch)
+- **[HOW-TO.md](HOW-TO.md)** - Complete usage guide with examples from basic to extreme simulations
+- **[TESTING.md](TESTING.md)** - Docker testing procedures and verification commands
+- **[NEXT-STEPS.md](NEXT-STEPS.md)** - Development roadmap and technical debt analysis
+- **[BUILD_CARRYOVER.md](BUILD_CARRYOVER.md)** - Development context and architecture overview
+
+## 🚀 Quick Start
+
+### Docker Deployment (Recommended)
 ```bash
-# Clone and build development version
+# Clone repository
 git clone https://github.com/davestj/ternary-fission-reactor.git
 cd ternary-fission-reactor
-git checkout develop
+
+# Start with Docker Compose
+docker-compose up -d
+
+# Access web dashboard
+open http://localhost:8080
+
+# Check system status
+curl http://localhost:8080/api/v1/health
+```
+
+### Native Development Build
+```bash
+# Ubuntu/Debian dependencies
+sudo apt update && sudo apt install -y \
+  build-essential gcc-13 g++-13 cmake make \
+  libssl-dev libcrypto++-dev libgsl-dev \
+  libeigen3-dev libfftw3-dev libopenblas-dev \
+  liblapack-dev libboost-all-dev
+
+# Build all components
 make all
 
 # Run API server
 ./bin/ternary-api -config configs/ternary_fission.conf -port 8080
+
+# Run physics simulation
+./bin/ternary-fission -n 1000 -p 235 -e 6.5 -j results.json
 ```
 
-### Production Release (master branch)
+### Production Release Installation
 ```bash
 # Download latest production release
 wget https://github.com/davestj/ternary-fission-reactor/releases/latest/download/ternary-fission-reactor-v1.1.1-prod.tar.gz
@@ -68,9 +97,6 @@ tar -xzf ternary-fission-reactor-v1.1.1-prod.tar.gz
 # Install system-wide
 wget https://github.com/davestj/ternary-fission-reactor/releases/latest/download/install.sh
 sudo ./install.sh
-
-# Start service
-ternary-api -config /etc/ternary-fission/ternary_fission.conf
 ```
 
 ## 📦 Download Options
@@ -105,75 +131,9 @@ ternary-api -config /etc/ternary-fission/ternary_fission.conf
 
 ### Version Strategy
 - **Alpha** (dev): `1.1.1-alpha.X` - Development builds
-- **Beta** (master PR): `1.1.1-beta.X` - Pre-release testing  
+- **Beta** (master PR): `1.1.1-beta.X` - Pre-release testing
 - **RC** (manual): `1.1.1-rc.X` - Release candidates
 - **Release** (tags): `1.1.1` - Production releases
-
-## 🛠️ Development
-
-### System Requirements
-- Ubuntu 24.04 LTS (or compatible)
-- GCC 13+ with C++17 support
-- Go 1.23+
-- CMake 3.16+
-- OpenSSL development libraries
-- 4GB+ RAM recommended
-
-### Dependencies Installation
-```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install -y \
-  build-essential gcc-13 g++-13 cmake make \
-  libssl-dev libcrypto++-dev libgsl-dev \
-  libeigen3-dev libfftw3-dev libopenblas-dev \
-  liblapack-dev libboost-all-dev
-```
-
-### Build System
-```bash
-# Complete build
-make all
-
-# Individual components
-make cpp-build         # C++ physics engine
-make go-build          # Go API server
-make docker-build      # Docker images
-
-# Testing
-make test-cpp          # C++ unit tests
-make test-go           # Go unit tests
-make test-integration  # Integration tests
-
-# Development
-make clean             # Clean build artifacts
-make dev-setup         # Setup development environment
-make benchmark         # Performance benchmarks
-```
-
-### Development Workflow
-```bash
-# 1. Create feature branch
-git checkout develop
-git checkout -b feature/new-physics-model
-
-# 2. Make changes and test
-make all
-make test
-
-# 3. Create pull request to develop
-git push origin feature/new-physics-model
-# → Triggers development build with debug + release artifacts
-
-# 4. Merge to develop
-# → Creates development source archives and artifacts
-
-# 5. Promote to production
-git checkout master
-git merge develop
-git push origin master
-# → Triggers production release with zip/tar.gz downloads
-```
 
 ## 🏢 Architecture
 
@@ -181,7 +141,7 @@ git push origin master
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                  Client Layer                           │
-│  Web UI, API Clients, Monitoring Dashboards            │
+│  Web Dashboard, API Clients, Monitoring Dashboards     │
 └─────────────────────────────────────────────────────────┘
                            │
                     HTTP/WebSocket API
@@ -202,23 +162,26 @@ git push origin master
 ### Key Files
 - `src/cpp/main.ternary.fission.application.cpp` - Main physics engine
 - `src/cpp/ternary.fission.simulation.engine.cpp` - Core simulation logic
-- `src/go/api.ternary.fission.server.go` - REST API server
+- `src/go/api.ternary.fission.server.go` - REST API server with dashboard
 - `include/physics.constants.definitions.h` - Physics constants
 - `configs/ternary_fission.conf` - Configuration file
 - `docker-compose.yml` - Container orchestration
 
 ## 🚀 Deployment
 
-### Docker Deployment
+### Docker Deployment (Working)
 ```bash
-# Development stack
-make docker-run
+# Start full stack
+docker-compose up -d
 
-# Production deployment
-docker-compose -f docker-compose.yml up -d
+# Check service status
+docker-compose ps
 
-# Monitor services
+# View application logs
 docker-compose logs -f ternary-fission-app
+
+# Stop services
+docker-compose down
 ```
 
 ### Native Installation
@@ -248,11 +211,15 @@ log_level=info
 
 ## 📊 API Documentation
 
-### REST Endpoints
+### Working REST Endpoints
 ```bash
-# System status
-GET /api/v1/status
-GET /api/v1/health
+# Web Dashboard
+GET /                    # Educational project interface
+
+# System monitoring
+GET /api/v1/health       # Health check (200 OK confirmed)
+GET /api/v1/status       # System status with JSON response
+GET /api/v1/metrics      # Prometheus metrics (working)
 
 # Energy field management  
 POST /api/v1/energy-fields
@@ -265,26 +232,28 @@ POST /api/v1/simulate/fission
 POST /api/v1/simulate/continuous
 DELETE /api/v1/simulate/continuous
 
-# Monitoring
-GET /api/v1/metrics      # Prometheus metrics
-WS /api/v1/ws/monitor    # WebSocket real-time
+# Real-time monitoring
+WS /api/v1/ws/monitor    # WebSocket real-time updates
 ```
 
-### Example Usage
+### Verified API Usage
 ```bash
-# Start API server
-ternary-api -port 8080 -config configs/ternary_fission.conf
+# Start API server (confirmed working)
+docker-compose up -d
+
+# Test health endpoint (200 OK response)
+curl http://localhost:8080/api/v1/health
+
+# Get system status (JSON response confirmed)
+curl http://localhost:8080/api/v1/status | jq
+
+# Access Prometheus metrics (working)
+curl http://localhost:8080/api/v1/metrics
 
 # Create energy field
 curl -X POST http://localhost:8080/api/v1/energy-fields \
   -H "Content-Type: application/json" \
   -d '{"initial_energy_mev": 235.0, "auto_dissipate": true}'
-
-# Get system status
-curl http://localhost:8080/api/v1/status | jq
-
-# WebSocket monitoring
-wscat -c ws://localhost:8080/api/v1/ws/monitor
 ```
 
 ## 🔬 Physics Simulation
@@ -317,7 +286,7 @@ wscat -c ws://localhost:8080/api/v1/ws/monitor
 
 ## 📈 Monitoring
 
-### Prometheus Metrics
+### Prometheus Metrics (Working)
 ```bash
 # Available at http://localhost:8080/api/v1/metrics
 ternary_fission_api_requests_total
@@ -332,12 +301,12 @@ ternary_fission_api_response_time_seconds
 - API request monitoring
 - Physics simulation statistics
 
-### Health Checks
+### Health Checks (Verified)
 ```bash
-# API health
+# API health (confirmed working)
 curl http://localhost:8080/api/v1/health
 
-# Container health  
+# Container health (working with proper status codes)
 docker-compose ps
 ```
 
@@ -355,8 +324,8 @@ cd src/go && go test -v ./... -coverprofile=coverage.out
 # Integration tests
 make test-integration
 
-# Performance benchmarks
-make benchmark
+# Docker testing (see TESTING.md)
+./scripts/test-docker.sh test-all
 ```
 
 ### Test Data
@@ -364,14 +333,16 @@ make benchmark
 - Conservation law verification
 - Memory leak detection with valgrind
 - Concurrent stress testing
+- Docker deployment verification
 
 ## 📚 Documentation
 
 ### Technical Documentation
-- [BUILD_CARRYOVER.md](BUILD_CARRYOVER.md) - Development context and roadmap
-- [Stargate Framework](https://davestj.com/bthl/stargate_framework/) - Theoretical physics foundation
-- [API Documentation](docs/api/) - Complete REST API reference
-- [Docker Guide](docs/docker/) - Container deployment guide
+- **[HOW-TO.md](HOW-TO.md)** - Complete usage guide from basic to extreme simulations
+- **[TESTING.md](TESTING.md)** - Docker testing procedures and API verification
+- **[NEXT-STEPS.md](NEXT-STEPS.md)** - Development roadmap and architecture improvements
+- **[BUILD_CARRYOVER.md](BUILD_CARRYOVER.md)** - Development context and system overview
+- **[Stargate Framework](https://davestj.com/bthl/stargate_framework/)** - Theoretical physics foundation
 
 ### Research Papers
 - Energy field mapping methodology
@@ -385,7 +356,7 @@ make benchmark
 1. Fork the repository
 2. Create feature branch from `develop`
 3. Make changes and add tests
-4. Ensure all builds pass
+4. Ensure all builds pass (including Docker)
 5. Submit pull request to `develop`
 6. Wait for review and automated testing
 7. Merge triggers development artifacts
@@ -397,6 +368,7 @@ make benchmark
 - Comprehensive documentation in comments
 - Thread-safe concurrent operations
 - Production-grade error handling
+- Docker deployment compatibility
 
 ### Testing Requirements
 - Unit tests for all new functionality
@@ -404,6 +376,7 @@ make benchmark
 - Performance benchmarks for physics code
 - Memory leak verification
 - Conservation law validation
+- Docker deployment testing
 
 ## 🔧 Troubleshooting
 
@@ -415,12 +388,11 @@ make clean && make all
 # Missing dependencies
 sudo apt install -y build-essential libssl-dev
 
-# Port conflicts
-ternary-api -port 8081
+# Docker issues
+docker-compose down && docker-compose up --build
 
-# Permission issues
-sudo make install
-sudo systemctl start ternary-fission
+# Port conflicts (API server uses port from config)
+docker-compose ps  # Check actual port assignments
 ```
 
 ### Debug Mode
@@ -429,10 +401,10 @@ sudo systemctl start ternary-fission
 make cpp-build BUILD_TYPE=debug
 
 # Verbose logging
-ternary-api -config configs/ternary_fission.conf -log-level debug
+./bin/ternary-api -config configs/ternary_fission.conf -log-level debug
 
-# Memory debugging
-valgrind ./bin/ternary-fission --help
+# Docker logs
+docker-compose logs -f ternary-fission-app
 ```
 
 ### Performance Issues
@@ -444,9 +416,8 @@ perf report
 # Memory profiling
 valgrind --tool=massif ./bin/ternary-fission
 
-# Check system resources
-htop
-iotop
+# Docker resource monitoring
+docker stats ternary-fission-emulator
 ```
 
 ## 📄 License
@@ -461,35 +432,41 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - Profile: https://davestj.com
 - ORCID: https://orcid.org/0009-0000-5077-9751
 
-## 🎯 Roadmap
+## 🎯 Updated Roadmap
 
-### Phase 1: Enhanced Physics (Next 2-4 weeks)
+### Phase 1: API Testing & Validation (Next 2-3 weeks)
+- Comprehensive API endpoint testing
+- WebSocket functionality validation
+- Performance optimization and load testing
+- Cross-platform Docker verification
+
+### Phase 2: Kubernetes Integration (3-4 weeks)
+- K8s deployment manifests
+- Service discovery and networking
+- Horizontal pod autoscaling
+- Production-ready configurations
+
+### Phase 3: Enhanced Physics Features (4-6 weeks)
 - Advanced nuclear data integration
-- Improved conservation algorithms
-- Statistical physics enhancement
-
-### Phase 2: Performance & Scalability (4-6 weeks)
+- Complete base mathematics implementation
 - GPU acceleration with CUDA
-- Distributed computing support
-- Database integration
+- Machine learning integration
 
-### Phase 3: Machine Learning (6-8 weeks)
-- Predictive energy modeling
-- Adaptive simulation parameters
-- Anomaly detection
-
-### Phase 4: Visualization (8-10 weeks)
-- 3D energy field visualization
-- React dashboard development
-- VR/AR support
+### Phase 4: Production Hardening (6-8 weeks)
+- Security audit and hardening
+- Performance benchmarking
+- Documentation completion
+- Academic validation
 
 ## 🔍 Related Projects
 
-- [Stargate Framework](https://davestj.com/bthl/stargate_framework/) - Theoretical foundation
-- [Nuclear Data Libraries](https://www.nndc.bnl.gov/) - Reference data
-- [MCNP Integration](docs/mcnp/) - Cross-validation tools
-- [GEANT4 Interface](docs/geant4/) - Particle transport
+- **[Stargate Framework](https://davestj.com/bthl/stargate_framework/)** - Theoretical foundation
+- **[Nuclear Data Libraries](https://www.nndc.bnl.gov/)** - Reference data
+- **[MCNP Integration](docs/mcnp/)** - Cross-validation tools
+- **[GEANT4 Interface](docs/geant4/)** - Particle transport
 
 ---
 
 **For technical support, feature requests, or collaboration opportunities, please open an issue or contact directly.**
+
+**Current Status**: Docker deployment working, Go API server operational, comprehensive testing in progress.
