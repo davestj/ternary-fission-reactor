@@ -327,15 +327,7 @@ start_api_server() {
     # We build command line arguments from environment variables
     api_args+=("--port=${API_PORT}")
     api_args+=("--config=${CONFIG_FILE}")
-    api_args+=("--log-level=${LOG_LEVEL}")
-
-    if [[ "${DEBUG:-false}" == "true" ]]; then
-        api_args+=("--debug")
-    fi
-
-    if [[ "${GO_ENV}" == "development" ]]; then
-        api_args+=("--cors-origin=*")
-    fi
+    # Note: Go server only supports --port and --config flags
 
     log_debug "API server arguments: ${api_args[*]}"
 
