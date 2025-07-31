@@ -64,7 +64,7 @@ CPP_MAIN := $(BIN_DIR)/ternary-fission
 GO_BINARY := $(BIN_DIR)/ternary-api
 
 # Version information
-VERSION := 1.0.0
+VERSION := 1.1.13
 BUILD_DATE := $(shell date -u +"%Y-%m-%d_%H:%M:%S_UTC")
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 

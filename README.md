@@ -329,7 +329,7 @@ make benchmark
 
 ### Technical Documentation
 - [BUILD_CARRYOVER.md](BUILD_CARRYOVER.md) - Development context and roadmap
-- [Stargate Framework](docs/stargate-framework/) - Theoretical physics foundation
+- [Stargate Framework](https://davestj.com/bthl/stargate_framework/) - Theoretical physics foundation
 - [API Documentation](docs/api/) - Complete REST API reference
 - [Docker Guide](docs/docker/) - Container deployment guide
 
@@ -418,7 +418,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 **bthlops (David StJ)**
 - Email: davestj@gmail.com
 - GitHub: https://github.com/davestj
-- Profile: https://www.davidstj.com
+- Profile: https://davestj.com
 - ORCID: https://orcid.org/0009-0000-5077-9751
 
 ## 🎯 Roadmap
@@ -445,7 +445,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🔍 Related Projects
 
-- [Stargate Framework](docs/stargate-framework/) - Theoretical foundation
+- [Stargate Framework](https://davestj.com/bthl/stargate_framework/) - Theoretical foundation
 - [Nuclear Data Libraries](https://www.nndc.bnl.gov/) - Reference data
 - [MCNP Integration](docs/mcnp/) - Cross-validation tools
 - [GEANT4 Interface](docs/geant4/) - Particle transport

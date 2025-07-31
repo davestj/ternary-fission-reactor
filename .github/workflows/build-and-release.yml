@@ -111,6 +111,7 @@ jobs:
         cp README.md artifacts/${{ needs.version.outputs.version }}/ 2>/dev/null || echo "No README"
         cp BUILD_CARRYOVER.md artifacts/${{ needs.version.outputs.version }}/ 2>/dev/null || echo "No BUILD_CARRYOVER"
         cp LICENSE artifacts/${{ needs.version.outputs.version }}/ 2>/dev/null || echo "No LICENSE"
+        cp HOWTO.md artifacts/${{ needs.version.outputs.version }}/ 2>/dev/null || echo "No HOWTO"
         
         # Create version file
         cat > artifacts/${{ needs.version.outputs.version }}/VERSION << EOF
@@ -205,6 +206,9 @@ jobs:
         cp release-binaries/SHA256SUMS release-assets/SHA256SUMS-BINARIES 2>/dev/null || echo "No binary checksums"
         cp release-source/SHA256SUMS release-assets/SHA256SUMS-SOURCE 2>/dev/null || echo "No source checksums"
         
+        # Include RELEASE.md in assets
+        cp RELEASE.md release-assets/ 2>/dev/null || echo "No RELEASE.md"
+        
         # Create combined checksums
         cd release-assets
         sha256sum * > SHA256SUMS-ALL 2>/dev/null || echo "No files to checksum"
@@ -214,6 +218,42 @@ jobs:
     - name: Generate release notes
       run: |
         RELEASE_TYPE="${{ needs.version.outputs.is_prod == 'true' && 'Production' || 'Development' }}"
+        
+        # Get last 5 commits for changelog
+        git log --oneline -5 > recent-commits.txt
+        
+        cat > RELEASE.md << EOF
+        # Ternary Fission Reactor ${{ needs.version.outputs.version }}
+        
+        **${RELEASE_TYPE} Release - $(date -u +"%Y-%m-%d %H:%M:%S UTC")**
+        
+        ## Changes
+        \`\`\`
+        $(cat recent-commits.txt)
+        \`\`\`
+        
+        ## Quick Start
+        \`\`\`bash
+        # Extract and run basic simulation
+        tar -xzf ${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}.tar.gz
+        cd ${{ needs.version.outputs.version }}
+        ./ternary-fission -n 100 -p 235 -e 6.5
+        
+        # High-intensity simulation  
+        ./ternary-fission -n 10000 -p 238 -e 8.5 -t 16 -c -d 300 -r 50
+        
+        # Interactive mode
+        ./ternary-fission -x
+        
+        # API Server
+        ./ternary-api -config configs/ternary_fission.conf -port 8080
+        \`\`\`
+        
+        See HOWTO.md for detailed usage examples.
+        EOF
+        
+        # Copy for GitHub release
+        cp RELEASE.md release-notes.md
         
         cat > release-notes.md << EOF
         ## Ternary Fission Reactor ${{ needs.version.outputs.version }}
