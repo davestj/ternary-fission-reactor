@@ -1,0 +1,222 @@
+#
+# File: monitoring/prometheus.yml
+# Author: bthlops (David StJ)
+# Date: July 31, 2025
+# Title: Prometheus Configuration for Ternary Fission Energy Emulation System Monitoring
+# Purpose: Metrics collection and alerting configuration for physics simulation monitoring
+# Reason: Provides comprehensive monitoring of simulation performance, energy fields, and system resources
+#
+# Change Log:
+# 2025-07-31: Initial creation with comprehensive metrics scraping configuration
+#             Added ternary fission application metrics collection
+#             Configured system metrics via node-exporter integration
+#             Added custom metrics for energy field monitoring
+#             Included performance alerting rules for simulation health
+#
+# Carry-over Context:
+# - Scrapes metrics from ternary fission API server on port 8080
+# - Monitors system resources for container health
+# - Tracks physics simulation performance and energy field states
+# - Provides data source for Grafana visualization dashboards
+# - Includes alerting rules for production monitoring
+
+# =============================================================================
+# GLOBAL CONFIGURATION
+# =============================================================================
+
+global:
+  # We set scraping interval for all targets
+  scrape_interval: 15s
+  
+  # We set evaluation interval for alerting rules
+  evaluation_interval: 15s
+  
+  # We add global labels to all metrics
+  external_labels:
+    cluster: 'ternary-fission'
+    environment: 'production'
+    region: 'local'
+
+# =============================================================================
+# ALERTING CONFIGURATION
+# =============================================================================
+
+# We configure alerting rules
+rule_files:
+  - "rules/*.yml"
+
+# We configure alert manager (if available)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# =============================================================================
+# SCRAPING JOBS CONFIGURATION
+# =============================================================================
+
+scrape_configs:
+
+  # We scrape Prometheus itself for monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # We scrape the main ternary fission application
+  - job_name: 'ternary-fission-api'
+    static_configs:
+      - targets: ['ternary-fission-app:8080']
+    scrape_interval: 10s
+    metrics_path: /api/v1/metrics
+    scrape_timeout: 10s
+    
+    # We add custom labels for the application
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: ternary-fission-app:8080
+    
+    # We define custom metric relabeling
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'ternary_fission_(.*)'
+        target_label: __name__
+        replacement: 'tf_${1}'
+
+  # We scrape system metrics if node-exporter is available
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+    metrics_path: /metrics
+    
+    # We filter relevant system metrics
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'node_(cpu|memory|disk|network).*'
+        action: keep
+
+  # We scrape Docker container metrics if cAdvisor is available
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 20s
+    metrics_path: /metrics
+    
+    # We filter container metrics to relevant ones
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'container_(cpu|memory|network|fs).*'
+        action: keep
+      - source_labels: [container_label_com_docker_compose_service]
+        regex: 'ternary-fission-app'
+        action: keep
+
+  # We scrape Redis metrics if Redis is available
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+    
+    # We use redis_exporter if available
+    params:
+      check-keys: ['*']
+    
+    # We only scrape if Redis profile is active
+    honor_labels: true
+
+# =============================================================================
+# REMOTE WRITE CONFIGURATION (Optional)
+# =============================================================================
+
+# We can configure remote write for long-term storage
+# remote_write:
+#   - url: "https://prometheus-remote-write-endpoint/api/v1/write"
+#     basic_auth:
+#       username: "user"
+#       password: "password"
+
+# =============================================================================
+# REMOTE READ CONFIGURATION (Optional)
+# =============================================================================
+
+# We can configure remote read for historical data
+# remote_read:
+#   - url: "https://prometheus-remote-read-endpoint/api/v1/read"
+#     basic_auth:
+#       username: "user"
+#       password: "password"
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+
+# We configure local storage retention
+storage:
+  tsdb:
+    # We retain data for 7 days (as configured in docker-compose)
+    retention.time: 7d
+    
+    # We set maximum storage size
+    retention.size: 1GB
+    
+    # We configure storage path (mounted volume)
+    path: /prometheus
+
+# =============================================================================
+# WEB INTERFACE CONFIGURATION
+# =============================================================================
+
+# We configure the web interface
+web:
+  # We enable lifecycle management API
+  enable-lifecycle: true
+  
+  # We set maximum concurrent queries
+  max-connections: 512
+  
+  # We configure external URL if behind proxy
+  # external-url: https://prometheus.example.com
+
+# =============================================================================
+# CUSTOM METRIC DEFINITIONS
+# =============================================================================
+
+# We define custom recording rules for ternary fission metrics
+# These will be in rules/ternary_fission.yml:
+
+# groups:
+#   - name: ternary_fission.rules
+#     rules:
+#       - record: tf:energy_field_efficiency
+#         expr: rate(tf_energy_fields_created_total[5m]) / rate(tf_energy_fields_dissipated_total[5m])
+#       
+#       - record: tf:simulation_throughput  
+#         expr: rate(tf_fission_events_total[1m])
+#       
+#       - record: tf:system_load_average
+#         expr: tf_cpu_utilization_percent / 100
+
+# =============================================================================
+# FEDERATION CONFIGURATION (Multi-Cluster)
+# =============================================================================
+
+# We can configure federation for multiple Prometheus instances
+# - job_name: 'federate'
+#   scrape_interval: 15s
+#   honor_labels: true
+#   metrics_path: '/federate'
+#   params:
+#     'match[]':
+#       - '{job=~"ternary-fission.*"}'
+#       - '{__name__=~"tf_.*"}'
+#   static_configs:
+#     - targets:
+#       - 'prometheus-cluster-1:9090'
+#       - 'prometheus-cluster-2:9090'
