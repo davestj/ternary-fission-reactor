@@ -47,11 +47,33 @@ jobs:
       run: |
         BUILD_NUM=${{ github.run_number }}
         
+        # We implement version rollover logic
         if [[ "${{ github.ref_name }}" == "master" ]] || [[ "${{ github.ref_name }}" == "main" ]]; then
-          VERSION="1.1.${BUILD_NUM}"
+          # Production versioning with rollover logic
+          if [[ $BUILD_NUM -ge 25 && $BUILD_NUM -lt 100 ]]; then
+            # v1.1.25+ becomes v1.2.1-beta
+            BETA_NUM=$((BUILD_NUM - 24))
+            VERSION="1.2.${BETA_NUM}-beta"
+          elif [[ $BUILD_NUM -ge 100 ]]; then
+            # v1.2.100+ becomes v1.3.1+ gold
+            GOLD_NUM=$((BUILD_NUM - 99))
+            VERSION="1.3.${GOLD_NUM}"
+          else
+            # v1.1.1-24 stays alpha
+            VERSION="1.1.${BUILD_NUM}"
+          fi
           IS_PROD="true"
         else
-          VERSION="1.1.${BUILD_NUM}-dev"
+          # Development versioning
+          if [[ $BUILD_NUM -ge 25 && $BUILD_NUM -lt 100 ]]; then
+            BETA_NUM=$((BUILD_NUM - 24))
+            VERSION="1.2.${BETA_NUM}-beta-dev"
+          elif [[ $BUILD_NUM -ge 100 ]]; then
+            GOLD_NUM=$((BUILD_NUM - 99))
+            VERSION="1.3.${GOLD_NUM}-dev"
+          else
+            VERSION="1.1.${BUILD_NUM}-alpha-dev"
+          fi
           IS_PROD="false"
         fi
         
@@ -60,7 +82,7 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "tag=$TAG" >> $GITHUB_OUTPUT
         echo "is_prod=$IS_PROD" >> $GITHUB_OUTPUT
-        echo "Generated version: $VERSION for branch ${{ github.ref_name }}"
+        echo "Generated version: $VERSION for branch ${{ github.ref_name }} (build #$BUILD_NUM)"
 
   # We build the application
   build:
