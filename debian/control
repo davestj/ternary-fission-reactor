@@ -1,0 +1,59 @@
+# debian/control - Debian Package Control File
+# Author: David St. John (davestj@gmail.com)
+# Date: 2025-07-31
+# Purpose: Debian package configuration for Ternary Fission Reactor
+# Version: 1.1.13
+#
+# Change Log:
+# - 2025-07-31: Initial Debian package configuration
+# - 2025-07-31: Added dependencies and package metadata
+# - 2025-07-31: Configured for static linking distribution
+# - 2025-07-31: Added proper architecture and section classification
+
+Source: ternary-fission-reactor
+Section: science
+Priority: optional
+Maintainer: David St. John <davestj@gmail.com>
+Build-Depends: debhelper (>= 12),
+               build-essential,
+               libjsoncpp-dev,
+               libssl-dev,
+               pkg-config,
+               cmake,
+               git
+Standards-Version: 4.5.1
+Homepage: https://github.com/davestj/ternary-fission-reactor
+Vcs-Git: https://github.com/davestj/ternary-fission-reactor.git
+Vcs-Browser: https://github.com/davestj/ternary-fission-reactor
+
+Package: ternary-fission-reactor
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends: gnuplot-x11 | gnuplot-qt
+Suggests: octave, python3-matplotlib
+Description: Advanced nuclear physics simulation and modeling software
+ The Ternary Fission Reactor is a sophisticated nuclear physics simulation
+ platform designed for modeling and analyzing ternary fission processes in
+ nuclear reactors. This software provides comprehensive tools for:
+ .
+  * Ternary fission cross-section calculations
+  * Neutron transport modeling
+  * Reactor criticality analysis
+  * Thermal hydraulics simulation
+  * Fuel burnup calculations
+  * Safety analysis and accident modeling
+ .
+ The software is designed for nuclear engineers, physicists, and researchers
+ working in nuclear reactor design, safety analysis, and nuclear fuel cycle
+ optimization. It features high-performance computing capabilities and
+ supports various reactor geometries and fuel types.
+ .
+ Key features include:
+  - Monte Carlo neutron transport simulation
+  - Advanced physics models for ternary fission
+  - Real-time visualization and plotting
+  - Comprehensive data analysis tools
+  - Export capabilities for further analysis
+ .
+ This package includes the main simulation engine, command-line utilities,
+ and example configuration files for getting started with reactor modeling.
