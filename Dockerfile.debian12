@@ -1,0 +1,89 @@
+#
+# File: Dockerfile.debian12
+# Author: bthlops (David StJ)
+# Date: July 31, 2025
+# Title: Debian 12 Docker Build - Fixed Build Args
+# Usage: docker build -f Dockerfile.debian12 -t ternary-fission:debian12 .
+
+ARG BUILD_DATE
+ARG GIT_COMMIT
+ARG VERSION=1.1.13
+
+FROM debian:12 AS cpp-builder
+
+ARG BUILD_DATE
+ARG GIT_COMMIT
+ARG VERSION
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y \
+    build-essential gcc g++ cmake make pkg-config \
+    libgsl-dev libeigen3-dev libfftw3-dev libopenblas-dev \
+    liblapack-dev libssl-dev libcrypto++-dev libboost-all-dev git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY include/ include/
+COPY src/cpp/ src/cpp/
+COPY Makefile .
+
+RUN make cpp-release \
+    VERSION_FLAGS="-DVERSION=\"${VERSION}\" -DBUILD_DATE=\"${BUILD_DATE}\" -DGIT_COMMIT=\"${GIT_COMMIT}\"" && \
+    strip bin/ternary-fission && chmod +x bin/ternary-fission
+
+FROM golang:1.23-alpine AS go-builder
+
+ARG BUILD_DATE
+ARG GIT_COMMIT
+ARG VERSION
+
+RUN apk add --no-cache git ca-certificates tzdata
+WORKDIR /app
+COPY src/go/go.mod src/go/go.sum ./
+RUN go mod download && go mod verify
+COPY src/go/ .
+
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-w -s -extldflags '-static' -X main.Version=${VERSION} -X main.BuildDate='${BUILD_DATE}' -X main.GitCommit=${GIT_COMMIT}" \
+    -a -installsuffix cgo -o api-server api.ternary.fission.server.go
+
+FROM debian:12 AS runtime
+
+ARG BUILD_DATE
+ARG GIT_COMMIT
+ARG VERSION
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y \
+    libgsl27 libfftw3-double3 libopenblas0-pthread liblapack3 \
+    libssl3 libcrypto++8 ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r bthlops && useradd -r -g bthlops -s /bin/false bthlops
+WORKDIR /app
+RUN mkdir -p /app/{bin,configs,data,results,logs} && chown -R bthlops:bthlops /app
+
+COPY --from=cpp-builder /build/bin/ternary-fission /app/bin/
+COPY --from=go-builder /app/api-server /app/bin/
+COPY configs/ /app/configs/
+COPY scripts/docker-entrypoint.sh /app/bin/
+
+RUN chmod +x /app/bin/* && chown -R bthlops:bthlops /app
+
+EXPOSE 8080
+HEALTHCHECK CMD curl -f http://localhost:8080/api/v1/health || exit 1
+USER bthlops
+
+ENV GO_ENV=production API_PORT=8080 CONFIG_FILE=/app/configs/ternary_fission.conf \
+    TF_VERSION=${VERSION} TF_BUILD_DATE=${BUILD_DATE} TF_GIT_COMMIT=${GIT_COMMIT}
+
+VOLUME ["/app/data", "/app/results", "/app/logs"]
+ENTRYPOINT ["/app/bin/docker-entrypoint.sh"]
+CMD ["api-server"]
+
+LABEL platform="debian12" version="${VERSION}" build_date="${BUILD_DATE}" git_commit="${GIT_COMMIT}" \
+      maintainer="bthlops <davestj@gmail.com>" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.source="https://github.com/davestj/ternary-fission-reactor"
