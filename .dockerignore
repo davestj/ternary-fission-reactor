@@ -1,0 +1,294 @@
+#
+# File: .dockerignore
+# Author: bthlops (David StJ)
+# Date: July 31, 2025
+# Title: Docker Build Context Exclusions for Ternary Fission Energy Emulation System
+# Purpose: Optimizes Docker build context by excluding unnecessary files and directories
+# Reason: Reduces build time, transfer size, and prevents sensitive files from entering containers
+#
+# Change Log:
+# 2025-07-31: Initial creation with comprehensive exclusions for C++/Go project
+#             Added build artifacts, logs, and temporary file exclusions
+#             Included git, IDE, and OS-specific file exclusions
+#             Added security exclusions for sensitive files
+#
+# Carry-over Context:
+# - Excludes all build artifacts to force clean builds in containers
+# - Prevents sensitive files and credentials from entering build context
+# - Optimizes build performance by reducing context size
+# - Includes common IDE and OS temporary file patterns
+
+# =============================================================================
+# BUILD ARTIFACTS AND BINARIES
+# =============================================================================
+
+# We exclude all compiled binaries and object files
+bin/
+build/
+dist/
+target/
+*.o
+*.a
+*.so
+*.dll
+*.exe
+*.dylib
+
+# We exclude intermediate build files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile.bak
+*.cmake
+
+# We exclude profiling and debugging files
+gmon.out
+*.gcov
+*.gcno
+*.gcda
+core
+core.*
+vgcore.*
+callgrind.out.*
+
+# We exclude test results and coverage reports
+coverage.out
+coverage.xml
+coverage.info
+coverage_html/
+test-results/
+junit.xml
+*.test
+
+# =============================================================================
+# DEVELOPMENT AND TEMPORARY FILES
+# =============================================================================
+
+# We exclude logs and temporary files
+logs/
+*.log
+log/
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# We exclude backup files
+*.bak
+*.backup
+*.old
+*_backup
+*_old
+
+# We exclude archive files (unless specifically needed)
+*.tar
+*.tar.gz
+*.tar.bz2
+*.zip
+*.rar
+*.7z
+
+# =============================================================================
+# VERSION CONTROL AND PROJECT FILES
+# =============================================================================
+
+# We exclude version control directories
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+.svn/
+.hg/
+.bzr/
+CVS/
+
+# We exclude documentation build artifacts
+docs/_build/
+docs/build/
+site/
+_site/
+
+# We exclude IDE and editor files
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+*.code-workspace
+
+# We exclude OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# =============================================================================
+# DEPENDENCY AND CACHE DIRECTORIES
+# =============================================================================
+
+# We exclude Go module cache and vendor directories
+vendor/
+go.sum.backup
+
+# We exclude Node.js dependencies (if any)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# We exclude package manager files
+*.lock
+package-lock.json
+yarn.lock
+
+# =============================================================================
+# DATA AND RESULTS DIRECTORIES
+# =============================================================================
+
+# We exclude data directories (should be mounted as volumes)
+data/
+results/
+output/
+
+# We exclude simulation results and temporary data
+*.json
+*.csv
+*.dat
+simulation_*
+benchmark_*
+profile_*
+valgrind_*
+
+# =============================================================================
+# CONFIGURATION AND SECRETS
+# =============================================================================
+
+# We exclude environment and secret files
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# We exclude local configuration overrides
+local.conf
+dev.conf
+*_local.*
+.local/
+
+# =============================================================================
+# DOCKER AND CONTAINER FILES
+# =============================================================================
+
+# We exclude Docker artifacts
+.dockerignore.bak
+docker-compose.override.yml
+docker-compose.*.yml.bak
+
+# We exclude container runtime files
+.container-*
+containers/
+
+# =============================================================================
+# TESTING AND QUALITY ASSURANCE
+# =============================================================================
+
+# We exclude testing artifacts
+.pytest_cache/
+.tox/
+.coverage
+htmlcov/
+.nyc_output
+coverage/
+
+# We exclude linting and static analysis reports
+.eslintcache
+pylint.log
+mypy.log
+flake8.log
+static_analysis.xml
+clang_tidy_report.txt
+go_vet_report.txt
+
+# =============================================================================
+# MONITORING AND METRICS
+# =============================================================================
+
+# We exclude monitoring data (should be in volumes)
+prometheus/
+grafana/
+metrics/
+monitoring_data/
+
+# =============================================================================
+# PLATFORM-SPECIFIC EXCLUSIONS
+# =============================================================================
+
+# We exclude Windows-specific files
+*.exe
+*.pdb
+*.idb
+*.ilk
+*.obj
+*.tlog
+*.res
+*.rc2
+*.vspscc
+*.vssscc
+
+# We exclude macOS-specific files
+.AppleDouble
+.LSOverride
+.DocumentRevisions-V100
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# We exclude Linux-specific files
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# CUSTOM PROJECT EXCLUSIONS
+# =============================================================================
+
+# We exclude specific project artifacts
+energy_field_*
+fission_events.log
+*.profile
+*.memcheck
+*.trace
+
+# We exclude development database files
+*.db
+*.sqlite
+*.sqlite3
+
+# We exclude compiled Go binaries
+ternary-api
+ternary-fission
+api-server
+
+# We exclude auto-generated files
+AUTO_*
+*_AUTO.*
+generated/
