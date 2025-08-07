@@ -54,7 +54,6 @@
 #include <sys/sysctl.h>
 #elif defined(__linux__)
 #include <sys/sysinfo.h>
-#include <proc/readproc.h>
 #endif
 
 namespace TernaryFission {
@@ -177,7 +176,7 @@ bool DaemonTernaryFissionServer::initialize() {
     }
     
     // We load daemon configuration
-    auto daemon_config = config_manager_->getDaemonConfiguration();
+    auto daemon_config = config_manager_->getDaemonConfig();
     process_info_->pid_file_path = daemon_config.pid_file_path;
     process_info_->working_directory = daemon_config.working_directory;
     
@@ -203,7 +202,7 @@ bool DaemonTernaryFissionServer::initialize() {
     process_info_->file_creation_mask = static_cast<mode_t>(daemon_config.umask_value);
     
     // We initialize log file paths
-    auto logging_config = config_manager_->getLoggingConfiguration();
+    auto logging_config = config_manager_->getLoggingConfig();
     access_log_path_ = logging_config.access_log_path;
     error_log_path_ = logging_config.error_log_path;
     debug_log_path_ = logging_config.debug_log_path;
@@ -245,7 +244,7 @@ bool DaemonTernaryFissionServer::startDaemon() {
     
     updateDaemonStatus(DaemonStatus::STARTING);
     
-    auto daemon_config = config_manager_->getDaemonConfiguration();
+    auto daemon_config = config_manager_->getDaemonConfig();
     
     // We perform daemonization if daemon mode is enabled
     if (daemon_config.daemon_mode) {
@@ -943,7 +942,7 @@ std::string DaemonTernaryFissionServer::getStatusString() const {
  * This method checks daemon-specific configuration for validity
  */
 bool DaemonTernaryFissionServer::validateDaemonConfiguration() {
-    auto daemon_config = config_manager_->getDaemonConfiguration();
+    auto daemon_config = config_manager_->getDaemonConfig();
     
     // We validate PID file path
     if (daemon_config.create_pid_file && daemon_config.pid_file_path.empty()) {
@@ -966,7 +965,7 @@ bool DaemonTernaryFissionServer::validateDaemonConfiguration() {
  * This method validates filesystem and system permissions
  */
 bool DaemonTernaryFissionServer::checkRequiredPermissions() {
-    auto daemon_config = config_manager_->getDaemonConfiguration();
+    auto daemon_config = config_manager_->getDaemonConfig();
     
     // We check PID file directory write permissions
     if (daemon_config.create_pid_file) {
@@ -985,7 +984,7 @@ bool DaemonTernaryFissionServer::checkRequiredPermissions() {
  * This method prevents multiple daemon instances
  */
 bool DaemonTernaryFissionServer::isAnotherInstanceRunning() const {
-    auto daemon_config = config_manager_->getDaemonConfiguration();
+    auto daemon_config = config_manager_->getDaemonConfig();
     
     if (!daemon_config.create_pid_file) {
         return false;  // Cannot check without PID file
