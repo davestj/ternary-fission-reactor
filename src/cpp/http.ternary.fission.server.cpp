@@ -1229,11 +1229,9 @@ void HTTPTernaryFissionServer::handleSimulationReset(const httplib::Request& req
 }
 
 // Additional forward declaration for full verifyConservationLaws signature
-namespace TernaryFission {
-    bool verifyConservationLaws(const TernaryFissionEvent& event,
-                                double energy_tolerance,
-                                double momentum_tolerance);
-}
+bool verifyConservationLaws(const TernaryFissionEvent& event,
+                            double energy_tolerance,
+                            double momentum_tolerance);
 
 void HTTPTernaryFissionServer::handleFissionCalculation(const httplib::Request& req, httplib::Response& res) {
     Json::Value body;
