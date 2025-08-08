@@ -461,7 +461,7 @@ void HTTPTernaryFissionServer::setupMiddleware() {
     });
     
     // We setup error handler
-    server->set_error_handler([this](const httplib::Request& req, httplib::Response& res) {
+    server->set_error_handler([this](const httplib::Request& /*req*/, httplib::Response& res) {
         this->sendErrorResponse(res, 500, "Internal server error");
     });
     
@@ -500,7 +500,7 @@ void HTTPTernaryFissionServer::corsMiddleware(const httplib::Request& req, httpl
  * We implement logging middleware for request tracking
  * This method logs all HTTP requests with timing information
  */
-void HTTPTernaryFissionServer::loggingMiddleware(const httplib::Request& req, httplib::Response& res) {
+void HTTPTernaryFissionServer::loggingMiddleware(const httplib::Request& req, httplib::Response& /*res*/) {
     auto start_time = std::chrono::steady_clock::now();
 
     // We log request details
@@ -519,7 +519,7 @@ void HTTPTernaryFissionServer::loggingMiddleware(const httplib::Request& req, ht
  * We implement metrics middleware for performance tracking
  * This method collects performance statistics for all requests
  */
-void HTTPTernaryFissionServer::metricsMiddleware(const httplib::Request& req, httplib::Response& res) {
+void HTTPTernaryFissionServer::metricsMiddleware(const httplib::Request& req, httplib::Response& /*res*/) {
     metrics_->incrementRequests();
     
     // We track endpoint-specific metrics
@@ -615,7 +615,7 @@ void HTTPTernaryFissionServer::setupAPIEndpoints() {
  * We handle health check endpoint requests
  * This method provides basic server health information for monitoring
  */
-void HTTPTernaryFissionServer::handleHealthCheck(const httplib::Request& req, httplib::Response& res) {
+void HTTPTernaryFissionServer::handleHealthCheck(const httplib::Request& /*req*/, httplib::Response& res) {
     auto uptime = std::chrono::duration_cast<std::chrono::seconds>(
         std::chrono::system_clock::now() - start_time_
     );
@@ -644,7 +644,7 @@ void HTTPTernaryFissionServer::handleHealthCheck(const httplib::Request& req, ht
  * We handle system status endpoint requests
  * This method provides comprehensive system status information
  */
-void HTTPTernaryFissionServer::handleSystemStatus(const httplib::Request& req, httplib::Response& res) {
+void HTTPTernaryFissionServer::handleSystemStatus(const httplib::Request& /*req*/, httplib::Response& res) {
     SystemStatusResponse status = generateSystemStatus();
     sendJSONResponse(res, 200, status.toJson());
     metrics_->incrementSuccessful();
@@ -656,7 +656,7 @@ void HTTPTernaryFissionServer::handleSystemStatus(const httplib::Request& req, h
  * We handle energy fields list endpoint requests
  * This method returns all active energy fields
  */
-void HTTPTernaryFissionServer::handleEnergyFieldsList(const httplib::Request& req, httplib::Response& res) {
+void HTTPTernaryFissionServer::handleEnergyFieldsList(const httplib::Request& /*req*/, httplib::Response& res) {
     std::lock_guard<std::mutex> lock(fields_mutex_);
     
     Json::Value fields_array(Json::arrayValue);
@@ -1185,7 +1185,7 @@ void HTTPTernaryFissionServer::handleSimulationStart(const httplib::Request& req
     }
 }
 
-void HTTPTernaryFissionServer::handleSimulationStop(const httplib::Request& req, httplib::Response& res) {
+void HTTPTernaryFissionServer::handleSimulationStop(const httplib::Request& /*req*/, httplib::Response& res) {
     std::lock_guard<std::mutex> lock(simulation_mutex_);
     if (!simulation_engine_) {
         sendErrorResponse(res, 500, "Simulation engine not initialized");
@@ -1203,7 +1203,7 @@ void HTTPTernaryFissionServer::handleSimulationStop(const httplib::Request& req,
     }
 }
 
-void HTTPTernaryFissionServer::handleSimulationReset(const httplib::Request& req, httplib::Response& res) {
+void HTTPTernaryFissionServer::handleSimulationReset(const httplib::Request& /*req*/, httplib::Response& res) {
     std::lock_guard<std::mutex> lock(simulation_mutex_);
     if (!simulation_engine_) {
         sendErrorResponse(res, 500, "Simulation engine not initialized");
@@ -1364,7 +1364,7 @@ void HTTPTernaryFissionServer::handleEnergyGeneration(const httplib::Request& re
     }
 }
 
-void HTTPTernaryFissionServer::handleFieldStatistics(const httplib::Request& req, httplib::Response& res) {
+void HTTPTernaryFissionServer::handleFieldStatistics(const httplib::Request& /*req*/, httplib::Response& res) {
     Json::Value stats = computeFieldStatistics();
     sendJSONResponse(res, 200, stats);
     metrics_->incrementSuccessful();
@@ -1441,7 +1441,7 @@ std::string HTTPTernaryFissionServer::generateConnectionID() {
     return "ws_" + std::to_string(id);
 }
 
-Json::Value HTTPTernaryFissionServer::processPhysicsRequest(const Json::Value& request) {
+Json::Value HTTPTernaryFissionServer::processPhysicsRequest(const Json::Value& /*request*/) {
     // Physics request processing will be implemented with engine integration
     Json::Value response;
     response["status"] = "not_implemented";
