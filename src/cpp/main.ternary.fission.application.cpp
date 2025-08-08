@@ -207,8 +207,13 @@ int main(int argc, char* argv[]) {
     }
 
 
-    // Initialize physics utilities using daemon configuration defaults
-    initializePhysicsUtilities();
+
+    // Retrieve physics configuration from the daemon server
+    auto config_manager = std::make_unique<ConfigurationManager>();
+    DaemonTernaryFissionServer daemon_server(std::move(config_manager));
+    ConfigurationManager* daemon_config = daemon_server.getConfiguration();
+    initializePhysicsUtilities(&daemon_config->getPhysicsConfig());
+
 
     // Print simulation parameters
     std::cout << "Simulation Parameters:" << std::endl;
@@ -478,6 +483,7 @@ void runDaemonMode(const std::string& config_file, const std::string& bind_ip, i
 
         // Initialize physics engine
         auto physics_config = daemon_manager->getConfiguration()->getPhysicsConfig();
+
         auto engine = std::make_shared<TernaryFissionSimulationEngine>(
             physics_config.default_parent_mass,
             physics_config.default_excitation_energy,

@@ -219,9 +219,6 @@ $(TEST_BUILD_DIR):
 $(BUILD_SUBDIR)/%.o: $(CPP_SRC_DIR)/%.cpp | $(BUILD_SUBDIR)
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
 
-$(CPP_MAIN): $(CPP_OBJECTS) | $(BIN_DIR)
-	$(CXX) $(CPP_OBJECTS) $(LDFLAGS) $(LIBS) -o $@
-	@echo "✓ C++ binary built: $@"
 
 # =============================================================================
 # GO BUILD
