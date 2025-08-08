@@ -62,6 +62,8 @@ Json::Value EnergyFieldResponse::toJson() const {
     json["dissipation_rate"] = dissipation_rate;
     json["base_three_mev_per_sec"] = base_three_mev_per_sec;
     json["entropy_factor"] = entropy_factor;
+    json["active"] = active;
+    json["total_energy_mev"] = total_energy_mev;
     json["status"] = status;
     
     // We format timestamps in ISO 8601 format
@@ -107,7 +109,15 @@ bool EnergyFieldResponse::fromJson(const Json::Value& json) {
         if (json.isMember("entropy_factor") && json["entropy_factor"].isNumeric()) {
             entropy_factor = json["entropy_factor"].asDouble();
         }
-        
+
+        if (json.isMember("active") && json["active"].isBool()) {
+            active = json["active"].asBool();
+        }
+
+        if (json.isMember("total_energy_mev") && json["total_energy_mev"].isNumeric()) {
+            total_energy_mev = json["total_energy_mev"].asDouble();
+        }
+
         if (json.isMember("status") && json["status"].isString()) {
             status = json["status"].asString();
         }
@@ -663,6 +673,8 @@ void HTTPTernaryFissionServer::handleEnergyFieldCreate(const httplib::Request& r
     field->created_at = std::chrono::system_clock::now();
     field->last_updated = field->created_at;
     field->status = "active";
+    field->active = true;
+    field->total_energy_mev = field->energy_level_mev;
     
     // We validate physics parameters
     if (field->energy_level_mev < 0 || field->energy_level_mev > 1000000) {
@@ -960,11 +972,15 @@ void HTTPTernaryFissionServer::updateFieldStatistics() {
     // We update field timestamps and status
     for (auto& [field_id, field] : energy_fields_) {
         field->last_updated = std::chrono::system_clock::now();
-        
+
+        // We synchronize boolean active state with status
+        field->active = (field->status == "active");
+
         // We simulate field evolution for demonstration
         if (field->status == "active") {
             field->energy_level_mev *= (1.0 - field->dissipation_rate * 0.001);
             field->entropy_factor += 0.001;
+            field->total_energy_mev += field->energy_level_mev;
         }
     }
 }
@@ -1044,18 +1060,47 @@ void HTTPTernaryFissionServer::handleEnergyGeneration(const httplib::Request& re
 }
 
 void HTTPTernaryFissionServer::handleFieldStatistics(const httplib::Request& req, httplib::Response& res) {
-    Json::Value stats;
-    stats["total_fields"] = static_cast<int>(energy_fields_.size());
-    stats["active_fields"] = static_cast<int>(energy_fields_.size()); // All fields considered active
-    stats["total_energy_mev"] = 0.0;
-    
-    std::lock_guard<std::mutex> lock(fields_mutex_);
-    for (const auto& [field_id, field] : energy_fields_) {
-        stats["total_energy_mev"] = stats["total_energy_mev"].asDouble() + field->energy_level_mev;
-    }
-    
+    Json::Value stats = computeFieldStatistics();
     sendJSONResponse(res, 200, stats);
     metrics_->incrementSuccessful();
+}
+
+Json::Value HTTPTernaryFissionServer::computeFieldStatistics() const {
+    Json::Value stats;
+    std::lock_guard<std::mutex> lock(fields_mutex_);
+
+    int total_fields = static_cast<int>(energy_fields_.size());
+    int active_fields = 0;
+    double total_energy = 0.0;
+    double peak_energy = 0.0;
+
+    for (const auto& [field_id, field] : energy_fields_) {
+        total_energy += field->energy_level_mev;
+        if (field->energy_level_mev > peak_energy) {
+            peak_energy = field->energy_level_mev;
+        }
+        if (field->status == "active" || field->active) {
+            active_fields++;
+        }
+    }
+
+    int inactive_fields = total_fields - active_fields;
+    double average_energy = total_fields > 0 ? total_energy / total_fields : 0.0;
+
+    stats["total_fields"] = total_fields;
+    stats["active_fields"] = active_fields;
+    stats["inactive_fields"] = inactive_fields;
+    stats["total_energy_mev"] = total_energy;
+    stats["average_energy_mev"] = average_energy;
+    stats["peak_energy_mev"] = peak_energy;
+
+    return stats;
+}
+
+void HTTPTernaryFissionServer::addEnergyField(const EnergyFieldResponse& field) {
+    std::lock_guard<std::mutex> lock(fields_mutex_);
+    auto new_field = std::make_unique<EnergyFieldResponse>(field);
+    energy_fields_[new_field->field_id] = std::move(new_field);
 }
 
 // We implement remaining interface methods
@@ -1070,11 +1115,13 @@ bool HTTPTernaryFissionServer::validateConfiguration() const {
 std::vector<EnergyFieldResponse> HTTPTernaryFissionServer::getActiveEnergyFields() const {
     std::vector<EnergyFieldResponse> fields;
     std::lock_guard<std::mutex> lock(fields_mutex_);
-    
+
     for (const auto& [field_id, field] : energy_fields_) {
-        fields.push_back(*field);
+        if (field->status == "active" || field->active) {
+            fields.push_back(*field);
+        }
     }
-    
+
     return fields;
 }
 

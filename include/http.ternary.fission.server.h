@@ -72,6 +72,8 @@ struct EnergyFieldResponse {
     double dissipation_rate = 0.0;             // Energy dissipation rate
     double base_three_mev_per_sec = 0.0;       // Base-3 energy generation rate
     double entropy_factor = 0.0;               // Entropy calculation factor
+    bool active = false;                       // Field active state
+    double total_energy_mev = 0.0;             // Cumulative energy processed
     std::chrono::system_clock::time_point created_at; // Field creation timestamp
     std::chrono::system_clock::time_point last_updated; // Last update timestamp
     std::string status = "inactive";           // Field operational status
@@ -159,7 +161,7 @@ private:
     
     // We manage energy fields and monitoring
     std::map<std::string, std::unique_ptr<EnergyFieldResponse>> energy_fields_;
-    std::mutex fields_mutex_;                   // Energy fields synchronization
+    mutable std::mutex fields_mutex_;                   // Energy fields synchronization
     std::atomic<int64_t> field_id_counter_;     // Field ID generation counter
     
     // We handle WebSocket connections
@@ -298,7 +300,19 @@ public:
      * This method checks all configuration values for validity and consistency
      */
     bool validateConfiguration() const;
-    
+
+    /**
+     * We add an energy field to internal storage
+     * This method is primarily for testing and initialization
+     */
+    void addEnergyField(const EnergyFieldResponse& field);
+
+    /**
+     * We compute statistics about all energy fields
+     * This method calculates aggregate metrics for monitoring
+     */
+    Json::Value computeFieldStatistics() const;
+
     /**
      * We get list of active energy fields
      * This method returns all currently active energy field configurations
