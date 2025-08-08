@@ -1,19 +1,3 @@
-#ifndef CONFIG_TERNARY_FISSION_SERVER_H
-#define CONFIG_TERNARY_FISSION_SERVER_H
-
-#include "physics.utilities.h"
-
-namespace TernaryFission {
-
-class Configuration {
-public:
-    Configuration();
-    const EnergyFieldConfig& getPhysicsConfig() const;
-
-private:
-    EnergyFieldConfig physics_config_;
-};
-
 /*
  * File: include/config.ternary.fission.server.h
  * Author: bthlops (David StJ)
@@ -38,7 +22,6 @@ private:
  * - Environment variable overrides follow hybrid configuration strategy
  * - Next: Integration with daemon and HTTP server classes for complete service
  */
-
 #ifndef CONFIG_TERNARY_FISSION_SERVER_H
 #define CONFIG_TERNARY_FISSION_SERVER_H
 
