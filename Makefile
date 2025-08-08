@@ -61,13 +61,15 @@ ifeq ($(PLATFORM), macos)
         CXXFLAGS += -I$(OPENSSL_PREFIX)/include -I$(JSONCPP_PREFIX)/include
         LDFLAGS += -L$(OPENSSL_PREFIX)/lib -L$(JSONCPP_PREFIX)/lib
         LIBS += -lssl -lcrypto -ljsoncpp -framework Security -framework CoreFoundation -lproc
+        CXXFLAGS += -DCPPHTTPLIB_OPENSSL_SUPPORT
 endif
 
 ifeq ($(PLATFORM), linux)
-	CXXFLAGS += $(shell pkg-config --cflags openssl jsoncpp)
-	LDFLAGS += $(shell pkg-config --libs openssl jsoncpp)
-	CXXFLAGS += -DLINUX
-	CFLAGS += -DLINUX
+        CXXFLAGS += $(shell pkg-config --cflags openssl jsoncpp)
+        LDFLAGS += $(shell pkg-config --libs openssl jsoncpp)
+        CXXFLAGS += -DLINUX
+        CFLAGS += -DLINUX
+        CXXFLAGS += -DCPPHTTPLIB_OPENSSL_SUPPORT
 endif
 
 CXXFLAGS += -DVERSION=\"$(VERSION)\" -DBUILD_DATE=\"$(BUILD_DATE)\" -DGIT_COMMIT=\"$(GIT_COMMIT)\"

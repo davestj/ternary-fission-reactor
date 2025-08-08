@@ -149,7 +149,9 @@ class HTTPTernaryFissionServer {
 private:
     std::unique_ptr<ConfigurationManager> config_manager_;     // Configuration management
     std::unique_ptr<httplib::Server> http_server_;            // HTTP server instance
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
     std::unique_ptr<httplib::SSLServer> https_server_;        // HTTPS server instance
+#endif
     std::shared_ptr<TernaryFissionSimulationEngine> simulation_engine_; // Physics engine
     std::mutex simulation_mutex_;                // Simulation state synchronization
     
@@ -217,7 +219,9 @@ private:
     // We implement SSL/TLS certificate management  
     bool loadSSLCertificates();                // Load SSL certificates
     bool validateSSLCertificate(const std::string& cert_path); // Validate certificate
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
     void setupSSLServer();                     // Configure HTTPS server
+#endif
     
     // We collect and manage server metrics
     void collectMetrics();                     // Metrics collection worker
