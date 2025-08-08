@@ -1186,19 +1186,147 @@ void HTTPTernaryFissionServer::handleSimulationReset(const httplib::Request& req
     }
 }
 
+// Additional forward declaration for full verifyConservationLaws signature
+namespace TernaryFission {
+    bool verifyConservationLaws(const TernaryFissionEvent& event,
+                                double energy_tolerance,
+                                double momentum_tolerance);
+}
+
 void HTTPTernaryFissionServer::handleFissionCalculation(const httplib::Request& req, httplib::Response& res) {
-    sendErrorResponse(res, 501, "Fission calculation not yet implemented");
-    metrics_->incrementErrors();
+    Json::Value body;
+    if (!parseJSONRequest(req, body)) {
+        sendErrorResponse(res, 400, "Invalid JSON payload");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    if (!simulation_engine_) {
+        sendErrorResponse(res, 500, "Simulation engine unavailable");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    double parent_mass = body.get("parent_mass", 0.0).asDouble();
+    double excitation_energy = body.get("excitation_energy", 0.0).asDouble();
+
+    if (parent_mass <= 0.0 || parent_mass > 300.0) {
+        sendErrorResponse(res, 400, "parent_mass must be between 0 and 300 AMU");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    if (excitation_energy < 0.0 || excitation_energy > 100.0) {
+        sendErrorResponse(res, 400, "excitation_energy must be between 0 and 100 MeV");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    try {
+        TernaryFissionEvent event = simulation_engine_->simulateTernaryFissionEvent(parent_mass, excitation_energy);
+
+        Json::Value response;
+        response["q_value"] = event.q_value;
+        response["total_kinetic_energy"] = event.total_kinetic_energy;
+
+        auto serializeFragment = [](const NuclearFragment& frag) {
+            Json::Value jf;
+            jf["mass"] = frag.mass;
+            jf["kinetic_energy"] = frag.kinetic_energy;
+            jf["momentum_x"] = frag.momentum_x;
+            jf["momentum_y"] = frag.momentum_y;
+            jf["momentum_z"] = frag.momentum_z;
+            return jf;
+        };
+
+        response["heavy_fragment"] = serializeFragment(event.heavy_fragment);
+        response["light_fragment"] = serializeFragment(event.light_fragment);
+        response["alpha_particle"] = serializeFragment(event.alpha_particle);
+
+        sendJSONResponse(res, 200, response);
+    } catch (const std::exception& e) {
+        sendErrorResponse(res, 500, std::string("Fission calculation failed: ") + e.what());
+        metrics_->incrementErrors();
+    }
 }
 
 void HTTPTernaryFissionServer::handleConservationLaws(const httplib::Request& req, httplib::Response& res) {
-    sendErrorResponse(res, 501, "Conservation laws check not yet implemented");
-    metrics_->incrementErrors();
+    Json::Value body;
+    if (!parseJSONRequest(req, body)) {
+        sendErrorResponse(res, 400, "Invalid JSON payload");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    try {
+        TernaryFissionEvent event;
+        event.q_value = body.get("q_value", 0.0).asDouble();
+
+        auto parseFragment = [](const Json::Value& jf, NuclearFragment& frag) {
+            frag.kinetic_energy = jf.get("kinetic_energy", 0.0).asDouble();
+            frag.momentum_x = jf.get("momentum_x", 0.0).asDouble();
+            frag.momentum_y = jf.get("momentum_y", 0.0).asDouble();
+            frag.momentum_z = jf.get("momentum_z", 0.0).asDouble();
+            frag.mass = jf.get("mass", 0.0).asDouble();
+        };
+
+        parseFragment(body["heavy_fragment"], event.heavy_fragment);
+        parseFragment(body["light_fragment"], event.light_fragment);
+        parseFragment(body["alpha_particle"], event.alpha_particle);
+
+        bool ok = verifyConservationLaws(event, 1e-3, 1e-6);
+
+        Json::Value response;
+        response["conserved"] = ok;
+        sendJSONResponse(res, 200, response);
+    } catch (const std::exception& e) {
+        sendErrorResponse(res, 400, std::string("Invalid event data: ") + e.what());
+        metrics_->incrementErrors();
+    }
 }
 
 void HTTPTernaryFissionServer::handleEnergyGeneration(const httplib::Request& req, httplib::Response& res) {
-    sendErrorResponse(res, 501, "Energy generation not yet implemented");
-    metrics_->incrementErrors();
+    Json::Value body;
+    if (!parseJSONRequest(req, body)) {
+        sendErrorResponse(res, 400, "Invalid JSON payload");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    if (!simulation_engine_) {
+        sendErrorResponse(res, 500, "Simulation engine unavailable");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    double energy_mev = body.get("energy_mev", 0.0).asDouble();
+    int rounds = body.get("dissipation_rounds", 0).asInt();
+
+    if (energy_mev <= 0.0) {
+        sendErrorResponse(res, 400, "energy_mev must be positive");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    try {
+        EnergyField field = simulation_engine_->createEnergyField(energy_mev);
+        if (rounds > 0) {
+            simulation_engine_->dissipateEnergyField(field, rounds);
+        }
+
+        Json::Value jf;
+        jf["initial_energy_mev"] = field.initial_energy_level;
+        jf["current_energy_mev"] = field.current_energy_level;
+        jf["memory_allocated_bytes"] = static_cast<Json::UInt64>(field.memory_allocated);
+        jf["cpu_cycles_consumed"] = static_cast<Json::UInt64>(field.cpu_cycles_consumed);
+        jf["entropy_factor"] = field.entropy_factor;
+        jf["energy_dissipated"] = field.energy_dissipated;
+
+        sendJSONResponse(res, 200, jf);
+    } catch (const std::exception& e) {
+        sendErrorResponse(res, 500, std::string("Energy generation failed: ") + e.what());
+        metrics_->incrementErrors();
+    }
 }
 
 void HTTPTernaryFissionServer::handleFieldStatistics(const httplib::Request& req, httplib::Response& res) {
