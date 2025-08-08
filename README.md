@@ -210,9 +210,15 @@ sudo nano /etc/ternary-fission/ternary_fission.conf
 
 # Key settings
 api_port=8080
-events_per_second=5.0  
+events_per_second=5.0
 max_energy_field=1000.0
 log_level=info
+```
+
+### SSL Certificate Management
+```bash
+# Generate a self-signed certificate for local testing
+./scripts/ssl-manager.sh --cn localhost --days 365
 ```
 
 ## 📊 API Documentation
