@@ -226,7 +226,9 @@ void HTTPServerMetrics::decrementConnections() {
 HTTPTernaryFissionServer::HTTPTernaryFissionServer(std::unique_ptr<ConfigurationManager> config_manager)
     : config_manager_(std::move(config_manager))
     , http_server_(nullptr)
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
     , https_server_(nullptr)
+#endif
     , simulation_engine_(nullptr)
     , bind_ip_("127.0.0.1")
     , bind_port_(8333)
@@ -282,6 +284,7 @@ bool HTTPTernaryFissionServer::initialize() {
               << (ssl_enabled_ ? " (HTTPS)" : " (HTTP)") << std::endl;
     
     // We initialize appropriate server type based on SSL configuration
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
     if (ssl_enabled_) {
         if (!loadSSLCertificates()) {
             std::cerr << "Error: Failed to load SSL certificates, falling back to HTTP" << std::endl;
@@ -290,7 +293,13 @@ bool HTTPTernaryFissionServer::initialize() {
             setupSSLServer();
         }
     }
-    
+#else
+    if (ssl_enabled_) {
+        std::cerr << "Warning: SSL support not available, falling back to HTTP" << std::endl;
+        ssl_enabled_ = false;
+    }
+#endif
+
     if (!ssl_enabled_) {
         http_server_ = std::make_unique<httplib::Server>();
     }
@@ -332,9 +341,12 @@ bool HTTPTernaryFissionServer::start() {
     std::cout << "Starting HTTP server on " << bind_ip_ << ":" << bind_port_ << std::endl;
     
     // We start appropriate server type
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
     if (ssl_enabled_ && https_server_) {
         return https_server_->listen(bind_ip_, bind_port_);
-    } else if (http_server_) {
+    } else
+#endif
+    if (http_server_) {
         return http_server_->listen(bind_ip_, bind_port_);
     }
     
@@ -355,9 +367,12 @@ void HTTPTernaryFissionServer::stop() {
     server_running_ = false;
     
     // We stop the appropriate server
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
     if (ssl_enabled_ && https_server_) {
         https_server_->stop();
-    } else if (http_server_) {
+    } else
+#endif
+    if (http_server_) {
         http_server_->stop();
     }
     
@@ -427,9 +442,13 @@ SystemStatusResponse HTTPTernaryFissionServer::getSystemStatus() const {
  * This method configures all middleware components in proper order
  */
 void HTTPTernaryFissionServer::setupMiddleware() {
-    auto server = ssl_enabled_ ? 
-        static_cast<httplib::Server*>(https_server_.get()) : 
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+    auto server = ssl_enabled_ ?
+        static_cast<httplib::Server*>(https_server_.get()) :
         static_cast<httplib::Server*>(http_server_.get());
+#else
+    auto server = static_cast<httplib::Server*>(http_server_.get());
+#endif
     
     if (!server) return;
     
@@ -512,9 +531,13 @@ void HTTPTernaryFissionServer::metricsMiddleware(const httplib::Request& req, ht
  * This method configures all REST API endpoints matching Go server structure
  */
 void HTTPTernaryFissionServer::setupAPIEndpoints() {
-    auto server = ssl_enabled_ ? 
-        static_cast<httplib::Server*>(https_server_.get()) : 
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+    auto server = ssl_enabled_ ?
+        static_cast<httplib::Server*>(https_server_.get()) :
         static_cast<httplib::Server*>(http_server_.get());
+#else
+    auto server = static_cast<httplib::Server*>(http_server_.get());
+#endif
     
     if (!server) return;
     
@@ -870,27 +893,29 @@ bool HTTPTernaryFissionServer::validateSSLCertificate(const std::string& cert_pa
     return true;
 }
 
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
 /**
  * We setup SSL server with certificates
  * This method configures HTTPS server with loaded certificates
  */
 void HTTPTernaryFissionServer::setupSSLServer() {
     auto ssl_config = config_manager_->getSSLConfiguration();
-    
+
     https_server_ = std::make_unique<httplib::SSLServer>(
         ssl_config.certificate_file.c_str(),
         ssl_config.private_key_file.c_str()
     );
-    
+
     if (!https_server_->is_valid()) {
         std::cerr << "Failed to create SSL server with certificates" << std::endl;
         https_server_.reset();
         ssl_enabled_ = false;
         return;
     }
-    
+
     std::cout << "HTTPS server configured with SSL certificates" << std::endl;
 }
+#endif
 
 /**
  * We initialize physics engine integration
