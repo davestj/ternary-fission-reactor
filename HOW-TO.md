@@ -53,6 +53,20 @@ curl http://localhost:8080/api/v1/metrics   # Prometheus metrics
 curl http://localhost:8080/                 # Educational interface
 ```
 
+## 🔧 Dependencies
+
+For native builds, install the header-only [cpp-httplib](https://github.com/yhirose/cpp-httplib) library:
+
+```bash
+# Debian/Ubuntu
+sudo apt-get install libhttplib-dev
+
+# macOS
+brew install cpp-httplib
+```
+
+The project also vendors the header at `third_party/cpp-httplib/httplib.h` if package installation isn't possible.
+
 ## 📊 Working API Endpoints (Verified)
 
 Based on confirmed testing, these endpoints are operational:

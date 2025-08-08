@@ -76,10 +76,16 @@ sudo apt update && sudo apt install -y \
   build-essential gcc-13 g++-13 cmake make \
   libssl-dev libcrypto++-dev libgsl-dev \
   libeigen3-dev libfftw3-dev libopenblas-dev \
-  liblapack-dev libboost-all-dev
+  liblapack-dev libboost-all-dev \
+  libhttplib-dev
+
+# macOS dependencies
+brew install jsoncpp openssl@3 cpp-httplib
 
 # Build all components
 make all
+
+# The cpp-httplib header is vendored under `third_party/cpp-httplib/httplib.h` if package managers are unavailable.
 
 # Run API server
 ./bin/ternary-api -config configs/ternary_fission.conf -port 8080
@@ -386,7 +392,7 @@ make test-integration
 make clean && make all
 
 # Missing dependencies
-sudo apt install -y build-essential libssl-dev
+sudo apt install -y build-essential libssl-dev libhttplib-dev
 
 # Docker issues
 docker-compose down && docker-compose up --build

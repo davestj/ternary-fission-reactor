@@ -17,6 +17,9 @@
 
 set -e  # Exit on any error
 
+# Determine script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -79,13 +82,14 @@ install_macos_deps() {
     brew update || log_warn "Failed to update Homebrew"
     
     # Install required packages
-    local packages=(
-        "jsoncpp"
-        "openssl@3"
-        "cppcheck"
-        "clang-format"
-        "pkg-config"
-    )
+      local packages=(
+          "jsoncpp"
+          "openssl@3"
+          "cppcheck"
+          "clang-format"
+          "pkg-config"
+          "cpp-httplib"
+      )
     
     for package in "${packages[@]}"; do
         log_info "Installing $package..."
@@ -140,6 +144,7 @@ install_debian_deps() {
         "build-essential"
         "libjsoncpp-dev"
         "libssl-dev"
+        "libhttplib-dev"
         "pkg-config"
         "cppcheck"
         "clang-tidy"
@@ -214,6 +219,19 @@ verify_macos_installation() {
         log_error "✗ OpenSSL header not found"
         exit 1
     fi
+
+    # Check cpp-httplib
+    if [ -f "$homebrew_prefix/include/httplib.h" ] || [ -f "$homebrew_prefix/include/cpp-httplib/httplib.h" ]; then
+        log_info "✓ cpp-httplib header found"
+    elif [ -f "$SCRIPT_DIR/third_party/cpp-httplib/httplib.h" ]; then
+        log_warn "cpp-httplib not found in system include path, installing vendored header"
+        sudo mkdir -p "$homebrew_prefix/include"
+        sudo cp "$SCRIPT_DIR/third_party/cpp-httplib/httplib.h" "$homebrew_prefix/include/httplib.h"
+        log_info "✓ Vendored cpp-httplib header installed"
+    else
+        log_error "✗ cpp-httplib header not found"
+        exit 1
+    fi
     
     # Check pkg-config files
     if pkg-config --exists jsoncpp; then
@@ -246,6 +264,18 @@ verify_linux_installation() {
         log_error "✗ OpenSSL not found"
         exit 1
     fi
+
+    # Check cpp-httplib
+    if [ -f "/usr/include/httplib.h" ] || [ -f "/usr/include/cpp-httplib/httplib.h" ]; then
+        log_info "✓ cpp-httplib header found"
+    elif [ -f "$SCRIPT_DIR/third_party/cpp-httplib/httplib.h" ]; then
+        log_warn "cpp-httplib not found in system include path, installing vendored header"
+        sudo cp "$SCRIPT_DIR/third_party/cpp-httplib/httplib.h" /usr/local/include/httplib.h
+        log_info "✓ Vendored cpp-httplib header installed"
+    else
+        log_error "✗ cpp-httplib not found"
+        exit 1
+    fi
     
     # Check build tools
     if command_exists g++; then
@@ -265,17 +295,19 @@ test_compilation() {
     cat > "$test_file" << 'EOF'
 #include <json/json.h>
 #include <openssl/ssl.h>
+#include <httplib.h>
 #include <iostream>
 
 int main() {
     Json::Value root;
     root["test"] = "success";
-    
+
     SSL_library_init();
-    
-    std::cout << "✓ JsonCpp and OpenSSL headers compiled successfully" << std::endl;
+    httplib::Client cli("localhost", 80);
+
+    std::cout << "✓ JsonCpp, OpenSSL, and cpp-httplib headers compiled successfully" << std::endl;
     std::cout << "JsonCpp test value: " << root["test"].asString() << std::endl;
-    
+
     return 0;
 }
 EOF
@@ -284,9 +316,9 @@ EOF
     local compile_cmd
     if [[ "$PLATFORM" == "macos" ]]; then
         local homebrew_prefix=$(brew --prefix)
-        compile_cmd="g++ -std=c++17 -I$homebrew_prefix/opt/jsoncpp/include -I$homebrew_prefix/opt/openssl@3/include -L$homebrew_prefix/opt/jsoncpp/lib -L$homebrew_prefix/opt/openssl@3/lib -ljsoncpp -lssl -lcrypto $test_file -o /tmp/json_test"
+        compile_cmd="g++ -std=c++17 -I$homebrew_prefix/opt/jsoncpp/include -I$homebrew_prefix/opt/openssl@3/include -I$homebrew_prefix/include -I$SCRIPT_DIR/third_party/cpp-httplib -L$homebrew_prefix/opt/jsoncpp/lib -L$homebrew_prefix/opt/openssl@3/lib -ljsoncpp -lssl -lcrypto $test_file -o /tmp/json_test"
     else
-        compile_cmd="g++ -std=c++17 $(pkg-config --cflags --libs jsoncpp openssl) $test_file -o /tmp/json_test"
+        compile_cmd="g++ -std=c++17 $(pkg-config --cflags --libs jsoncpp openssl) -I$SCRIPT_DIR/third_party/cpp-httplib $test_file -o /tmp/json_test"
     fi
     
     log_info "Compiling test program..."
