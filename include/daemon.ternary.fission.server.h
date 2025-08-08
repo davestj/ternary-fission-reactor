@@ -183,6 +183,7 @@ private:
     // We implement status reporting methods
     void updateDaemonStatus(DaemonStatus new_status); // Update daemon status atomically
     std::string getStatusString() const;        // Get human-readable status string
+    static std::string statusToString(DaemonStatus status); // Convert status enum to string
     void logStatusChange(DaemonStatus old_status, DaemonStatus new_status); // Log status changes
     
     // We implement configuration validation methods

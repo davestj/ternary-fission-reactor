@@ -917,16 +917,11 @@ void DaemonTernaryFissionServer::updateDaemonStatus(DaemonStatus new_status) {
  * We log daemon status changes
  * This method records status transitions for operational monitoring
  */
-void DaemonTernaryFissionServer::logStatusChange(DaemonStatus old_status, DaemonStatus new_status) {
-    std::cout << "Daemon status changed from " << getStatusString() << " to " << getStatusString() << std::endl;
-}
-
 /**
- * We get human-readable status string
- * This method converts status enum to readable string
+ * Convert status enum to readable string
  */
-std::string DaemonTernaryFissionServer::getStatusString() const {
-    switch (getStatus()) {
+std::string DaemonTernaryFissionServer::statusToString(DaemonStatus status) {
+    switch (status) {
         case DaemonStatus::STOPPED: return "STOPPED";
         case DaemonStatus::STARTING: return "STARTING";
         case DaemonStatus::RUNNING: return "RUNNING";
@@ -935,6 +930,19 @@ std::string DaemonTernaryFissionServer::getStatusString() const {
         case DaemonStatus::RESTARTING: return "RESTARTING";
         default: return "UNKNOWN";
     }
+}
+
+void DaemonTernaryFissionServer::logStatusChange(DaemonStatus old_status, DaemonStatus new_status) {
+    std::cout << "Daemon status changed from " << statusToString(old_status)
+              << " to " << statusToString(new_status) << std::endl;
+}
+
+/**
+ * We get human-readable status string
+ * This method converts current status enum to readable string
+ */
+std::string DaemonTernaryFissionServer::getStatusString() const {
+    return statusToString(getStatus());
 }
 
 /**
