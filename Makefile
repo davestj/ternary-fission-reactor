@@ -50,8 +50,9 @@ GO := go
 
 CXXFLAGS := $(CXXSTD) -Wall -Wextra -Wpedantic
 CFLAGS := $(CSTD) -Wall -Wextra -Wpedantic
-INCLUDES := -Iinclude
-LDFLAGS := 
+CPPFLAGS := -Iinclude
+CPPFLAGS += -Ithird_party/cpp-httplib
+LDFLAGS :=
 LIBS := -lm -lpthread
 
 ifeq ($(PLATFORM), macos)
@@ -128,7 +129,7 @@ $(TEST_BUILD_DIR):
 	@mkdir -p $@
 
 $(BUILD_SUBDIR)/%.o: $(CPP_SRC_DIR)/%.cpp | $(BUILD_SUBDIR)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
 
 $(CPP_MAIN): $(CPP_OBJECTS) | $(BIN_DIR)
 	$(CXX) $(CPP_OBJECTS) $(LDFLAGS) $(LIBS) -o $@
@@ -148,13 +149,13 @@ TEST_BIN := tests/system_metrics_test
 
 test: $(BUILD_DIR) $(TEST_BIN)
 	@mkdir -p $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) tests/test_fd_count.cpp $(LDFLAGS) $(LIBS) -o $(BUILD_DIR)/test_fd_count
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) tests/test_fd_count.cpp $(LDFLAGS) $(LIBS) -o $(BUILD_DIR)/test_fd_count
 	$(BUILD_DIR)/test_fd_count
 	./$(TEST_BIN)
 	@echo "✓ Tests passed"
 
 $(TEST_BIN): tests/system_metrics_test.cpp src/cpp/system.metrics.cpp | tests
-	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LDFLAGS) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $^ -o $@ $(LDFLAGS) $(LIBS)
 
 tests:
 	@mkdir -p tests
@@ -162,7 +163,7 @@ tests:
 qa: test
 	@echo "Running static analysis and linting..."
 	@which cppcheck > /dev/null && cppcheck $(CPP_SRC_DIR) $(TEST_DIR) --enable=all --suppress=missingIncludeSystem --xml --xml-version=2 2> cppcheck_report.xml || echo "cppcheck not installed"
-	@which clang-tidy > /dev/null && clang-tidy $(CPP_SOURCES) $(TEST_SOURCES) -- $(CXXFLAGS) $(INCLUDES) > clang_tidy_report.txt 2>&1 || echo "clang-tidy not installed"
+	@which clang-tidy > /dev/null && clang-tidy $(CPP_SOURCES) $(TEST_SOURCES) -- $(CXXFLAGS) $(CPPFLAGS) > clang_tidy_report.txt 2>&1 || echo "clang-tidy not installed"
 	@which scan-build > /dev/null && scan-build make $(CPP_MAIN) || echo "scan-build not installed"
 	@echo "✓ QA checks complete - reports generated"
 
