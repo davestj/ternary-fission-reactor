@@ -155,7 +155,7 @@ private:
     bool createPIDFile();                       // Create and lock PID file
     bool removePIDFile();                       // Remove PID file on shutdown
     bool validatePIDFile();                     // Validate existing PID file
-    pid_t readPIDFromFile();                    // Read PID from existing file
+    pid_t readPIDFromFile() const;              // Read PID from existing file
     bool lockPIDFile(int fd);                   // Lock PID file exclusively
     
     // We implement signal handling methods
