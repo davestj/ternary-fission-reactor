@@ -483,11 +483,12 @@ void HTTPTernaryFissionServer::corsMiddleware(const httplib::Request& req, httpl
  */
 void HTTPTernaryFissionServer::loggingMiddleware(const httplib::Request& req, httplib::Response& res) {
     auto start_time = std::chrono::steady_clock::now();
-    
+
     // We log request details
-    std::cout << "[" << std::put_time(std::localtime(&std::time(nullptr)), "%Y-%m-%d %H:%M:%S") << "] "
+    std::time_t now = std::time(nullptr);
+    std::cout << "[" << std::put_time(std::localtime(&now), "%Y-%m-%d %H:%M:%S") << "] "
               << req.method << " " << req.path << " from " << req.remote_addr << std::endl;
-    
+
     // We calculate response time when response is sent
     auto end_time = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
