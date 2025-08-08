@@ -85,6 +85,7 @@ public:
      * @return: Complete ternary fission event structure
      */
     TernaryFissionEvent simulateTernaryFissionEvent(double parent_mass, double excitation_energy);
+    TernaryFissionEvent simulateTernaryFissionEvent();
     Json::Value simulateTernaryFissionEventAPI(const Json::Value& request);
 
     /**
@@ -135,6 +136,10 @@ public:
      * @return: Current performance metrics
      */
     PerformanceMetrics getCurrentMetrics() const;
+
+    uint64_t getTotalEventsSimulated() const;
+    uint64_t getTotalEnergyFieldsCreated() const;
+    double getTotalComputationTimeSeconds() const;
 
     /**
      * Set number of worker threads
