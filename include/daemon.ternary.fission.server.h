@@ -270,6 +270,12 @@ public:
      * This method updates daemon configuration while maintaining operation
      */
     bool reloadConfiguration();
+
+    /**
+     * We get daemon configuration manager
+     * This method provides access to configuration management system
+     */
+    ConfigurationManager* getConfiguration() const;
     
     /**
      * We get daemon performance statistics
