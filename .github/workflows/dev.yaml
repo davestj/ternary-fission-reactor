@@ -1,0 +1,46 @@
+# File: .github/workflows/dev.yaml
+# Purpose: Development build verification
+name: Dev Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.name }}
+    strategy:
+      matrix:
+        include:
+          - name: ubuntu-24.04
+            runs-on: ubuntu-24.04
+          - name: debian-12
+            runs-on: ubuntu-24.04
+            container: debian:12
+    runs-on: ${{ matrix.runs-on }}
+    container: ${{ matrix.container }}
+    env:
+      GO_VERSION: "1.23.3"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install build tools
+        run: |
+          if command -v sudo >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y build-essential gcc g++ cmake make libssl-dev pkg-config
+          else
+            apt-get update
+            apt-get install -y build-essential gcc g++ cmake make libssl-dev pkg-config
+          fi
+
+      - name: Build C++ components
+        run: make cpp-build
+
+      - name: Build Go components
+        run: make go-build
