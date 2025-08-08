@@ -1014,18 +1014,76 @@ void HTTPTernaryFissionServer::handleEnergyFieldDelete(const httplib::Request& r
 }
 
 void HTTPTernaryFissionServer::handleSimulationStart(const httplib::Request& req, httplib::Response& res) {
-    sendErrorResponse(res, 501, "Simulation start not yet implemented");
-    metrics_->incrementErrors();
+    Json::Value request_json;
+    if (!req.body.empty() && !parseJSONRequest(req, request_json)) {
+        sendErrorResponse(res, 400, "Invalid JSON request body");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(simulation_mutex_);
+    if (!simulation_engine_) {
+        sendErrorResponse(res, 500, "Simulation engine not initialized");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    try {
+        Json::Value response = simulation_engine_->startContinuousSimulationAPI(request_json);
+        if (response.isMember("status") && response["status"].asString() == "error") {
+            sendJSONResponse(res, 400, response);
+            metrics_->incrementErrors();
+        } else {
+            sendJSONResponse(res, 200, response);
+            metrics_->incrementSuccessful();
+        }
+    } catch (const std::exception& e) {
+        sendErrorResponse(res, 500, std::string("Failed to start simulation: ") + e.what());
+        metrics_->incrementErrors();
+    }
 }
 
 void HTTPTernaryFissionServer::handleSimulationStop(const httplib::Request& req, httplib::Response& res) {
-    sendErrorResponse(res, 501, "Simulation stop not yet implemented");
-    metrics_->incrementErrors();
+    std::lock_guard<std::mutex> lock(simulation_mutex_);
+    if (!simulation_engine_) {
+        sendErrorResponse(res, 500, "Simulation engine not initialized");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    try {
+        Json::Value response = simulation_engine_->stopContinuousSimulationAPI();
+        sendJSONResponse(res, 200, response);
+        metrics_->incrementSuccessful();
+    } catch (const std::exception& e) {
+        sendErrorResponse(res, 500, std::string("Failed to stop simulation: ") + e.what());
+        metrics_->incrementErrors();
+    }
 }
 
 void HTTPTernaryFissionServer::handleSimulationReset(const httplib::Request& req, httplib::Response& res) {
-    sendErrorResponse(res, 501, "Simulation reset not yet implemented");
-    metrics_->incrementErrors();
+    std::lock_guard<std::mutex> lock(simulation_mutex_);
+    if (!simulation_engine_) {
+        sendErrorResponse(res, 500, "Simulation engine not initialized");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    try {
+        simulation_engine_->shutdown();
+        simulation_engine_ = std::make_shared<TernaryFissionSimulationEngine>();
+
+        Json::Value response;
+        response["status"] = "success";
+        response["message"] = "Simulation reset successfully";
+        response["simulation_running"] = false;
+
+        sendJSONResponse(res, 200, response);
+        metrics_->incrementSuccessful();
+    } catch (const std::exception& e) {
+        sendErrorResponse(res, 500, std::string("Failed to reset simulation: ") + e.what());
+        metrics_->incrementErrors();
+    }
 }
 
 void HTTPTernaryFissionServer::handleFissionCalculation(const httplib::Request& req, httplib::Response& res) {
