@@ -122,6 +122,7 @@ private:
     std::atomic<DaemonStatus> daemon_status_;   // Current daemon operational status
     std::atomic<bool> shutdown_requested_;      // Graceful shutdown request flag
     std::atomic<bool> restart_requested_;       // Daemon restart request flag
+    std::atomic<bool> debug_mode_;              // Verbose diagnostics flag
     std::chrono::system_clock::time_point start_time_; // Daemon startup timestamp
     
     // We manage signal handling system
@@ -155,7 +156,7 @@ private:
     bool createPIDFile();                       // Create and lock PID file
     bool removePIDFile();                       // Remove PID file on shutdown
     bool validatePIDFile();                     // Validate existing PID file
-    pid_t readPIDFromFile();                    // Read PID from existing file
+    pid_t readPIDFromFile() const;              // Read PID from existing file
     bool lockPIDFile(int fd);                   // Lock PID file exclusively
     
     // We implement signal handling methods
@@ -183,6 +184,7 @@ private:
     // We implement status reporting methods
     void updateDaemonStatus(DaemonStatus new_status); // Update daemon status atomically
     std::string getStatusString() const;        // Get human-readable status string
+    static std::string statusToString(DaemonStatus status); // Convert status enum to string
     void logStatusChange(DaemonStatus old_status, DaemonStatus new_status); // Log status changes
     
     // We implement configuration validation methods

@@ -29,6 +29,7 @@
 
 #include "http.ternary.fission.server.h"
 #include "physics.utilities.h"
+#include "system.metrics.h"
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -707,9 +708,10 @@ SystemStatusResponse HTTPTernaryFissionServer::generateSystemStatus() const {
     }
     
     // We calculate system resource usage
-    status.cpu_usage_percent = 0.0;  // TODO: Implement actual CPU monitoring
-    status.memory_usage_percent = 0.0;  // TODO: Implement actual memory monitoring
-    status.peak_memory_usage_bytes = 0;  // TODO: Implement memory tracking
+    status.cpu_usage_percent = getCPUUsagePercent();
+    MemoryUsage mem = getMemoryUsage();
+    status.memory_usage_percent = mem.percent;
+    status.peak_memory_usage_bytes = mem.peak_bytes;
     
     return status;
 }
@@ -987,8 +989,106 @@ void HTTPTernaryFissionServer::handleEnergyFieldGet(const httplib::Request& req,
 }
 
 void HTTPTernaryFissionServer::handleEnergyFieldUpdate(const httplib::Request& req, httplib::Response& res) {
-    sendErrorResponse(res, 501, "Energy field update not yet implemented");
-    metrics_->incrementErrors();
+    std::string field_id = req.matches[1];
+
+    Json::Value request_json;
+    if (!parseJSONRequest(req, request_json)) {
+        sendErrorResponse(res, 400, "Invalid JSON request body");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(fields_mutex_);
+    auto it = energy_fields_.find(field_id);
+    if (it == energy_fields_.end()) {
+        sendErrorResponse(res, 404, "Energy field not found");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    EnergyFieldResponse* field = it->second.get();
+    bool updated = false;
+
+    // Validate and update provided fields
+    if (request_json.isMember("energy_level_mev")) {
+        if (!request_json["energy_level_mev"].isNumeric()) {
+            sendErrorResponse(res, 400, "energy_level_mev must be numeric");
+            metrics_->incrementErrors();
+            return;
+        }
+        double level = request_json["energy_level_mev"].asDouble();
+        if (level < 0 || level > 1000000) {
+            sendErrorResponse(res, 400, "Energy level must be between 0 and 1,000,000 MeV");
+            metrics_->incrementErrors();
+            return;
+        }
+        field->energy_level_mev = level;
+        updated = true;
+    }
+
+    if (request_json.isMember("stability_factor")) {
+        if (!request_json["stability_factor"].isNumeric()) {
+            sendErrorResponse(res, 400, "stability_factor must be numeric");
+            metrics_->incrementErrors();
+            return;
+        }
+        field->stability_factor = request_json["stability_factor"].asDouble();
+        updated = true;
+    }
+
+    if (request_json.isMember("dissipation_rate")) {
+        if (!request_json["dissipation_rate"].isNumeric()) {
+            sendErrorResponse(res, 400, "dissipation_rate must be numeric");
+            metrics_->incrementErrors();
+            return;
+        }
+        field->dissipation_rate = request_json["dissipation_rate"].asDouble();
+        updated = true;
+    }
+
+    if (request_json.isMember("base_three_mev_per_sec")) {
+        if (!request_json["base_three_mev_per_sec"].isNumeric()) {
+            sendErrorResponse(res, 400, "base_three_mev_per_sec must be numeric");
+            metrics_->incrementErrors();
+            return;
+        }
+        field->base_three_mev_per_sec = request_json["base_three_mev_per_sec"].asDouble();
+        updated = true;
+    }
+
+    if (request_json.isMember("entropy_factor")) {
+        if (!request_json["entropy_factor"].isNumeric()) {
+            sendErrorResponse(res, 400, "entropy_factor must be numeric");
+            metrics_->incrementErrors();
+            return;
+        }
+        field->entropy_factor = request_json["entropy_factor"].asDouble();
+        updated = true;
+    }
+
+    if (request_json.isMember("status")) {
+        if (!request_json["status"].isString()) {
+            sendErrorResponse(res, 400, "status must be string");
+            metrics_->incrementErrors();
+            return;
+        }
+        field->status = request_json["status"].asString();
+        updated = true;
+    }
+
+    if (!updated) {
+        sendErrorResponse(res, 400, "No valid fields provided for update");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    field->last_updated = std::chrono::system_clock::now();
+
+    Json::Value response = field->toJson();
+    sendJSONResponse(res, 200, response);
+    metrics_->incrementSuccessful();
+
+    std::cout << "Energy field updated successfully: " << field_id << std::endl;
 }
 
 void HTTPTernaryFissionServer::handleEnergyFieldDelete(const httplib::Request& req, httplib::Response& res) {
@@ -1014,18 +1114,76 @@ void HTTPTernaryFissionServer::handleEnergyFieldDelete(const httplib::Request& r
 }
 
 void HTTPTernaryFissionServer::handleSimulationStart(const httplib::Request& req, httplib::Response& res) {
-    sendErrorResponse(res, 501, "Simulation start not yet implemented");
-    metrics_->incrementErrors();
+    Json::Value request_json;
+    if (!req.body.empty() && !parseJSONRequest(req, request_json)) {
+        sendErrorResponse(res, 400, "Invalid JSON request body");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(simulation_mutex_);
+    if (!simulation_engine_) {
+        sendErrorResponse(res, 500, "Simulation engine not initialized");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    try {
+        Json::Value response = simulation_engine_->startContinuousSimulationAPI(request_json);
+        if (response.isMember("status") && response["status"].asString() == "error") {
+            sendJSONResponse(res, 400, response);
+            metrics_->incrementErrors();
+        } else {
+            sendJSONResponse(res, 200, response);
+            metrics_->incrementSuccessful();
+        }
+    } catch (const std::exception& e) {
+        sendErrorResponse(res, 500, std::string("Failed to start simulation: ") + e.what());
+        metrics_->incrementErrors();
+    }
 }
 
 void HTTPTernaryFissionServer::handleSimulationStop(const httplib::Request& req, httplib::Response& res) {
-    sendErrorResponse(res, 501, "Simulation stop not yet implemented");
-    metrics_->incrementErrors();
+    std::lock_guard<std::mutex> lock(simulation_mutex_);
+    if (!simulation_engine_) {
+        sendErrorResponse(res, 500, "Simulation engine not initialized");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    try {
+        Json::Value response = simulation_engine_->stopContinuousSimulationAPI();
+        sendJSONResponse(res, 200, response);
+        metrics_->incrementSuccessful();
+    } catch (const std::exception& e) {
+        sendErrorResponse(res, 500, std::string("Failed to stop simulation: ") + e.what());
+        metrics_->incrementErrors();
+    }
 }
 
 void HTTPTernaryFissionServer::handleSimulationReset(const httplib::Request& req, httplib::Response& res) {
-    sendErrorResponse(res, 501, "Simulation reset not yet implemented");
-    metrics_->incrementErrors();
+    std::lock_guard<std::mutex> lock(simulation_mutex_);
+    if (!simulation_engine_) {
+        sendErrorResponse(res, 500, "Simulation engine not initialized");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    try {
+        simulation_engine_->shutdown();
+        simulation_engine_ = std::make_shared<TernaryFissionSimulationEngine>();
+
+        Json::Value response;
+        response["status"] = "success";
+        response["message"] = "Simulation reset successfully";
+        response["simulation_running"] = false;
+
+        sendJSONResponse(res, 200, response);
+        metrics_->incrementSuccessful();
+    } catch (const std::exception& e) {
+        sendErrorResponse(res, 500, std::string("Failed to reset simulation: ") + e.what());
+        metrics_->incrementErrors();
+    }
 }
 
 void HTTPTernaryFissionServer::handleFissionCalculation(const httplib::Request& req, httplib::Response& res) {

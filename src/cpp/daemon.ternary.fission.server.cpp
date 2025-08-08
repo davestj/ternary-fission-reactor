@@ -125,6 +125,7 @@ DaemonTernaryFissionServer::DaemonTernaryFissionServer(std::unique_ptr<Configura
     , daemon_status_(DaemonStatus::STOPPED)
     , shutdown_requested_(false)
     , restart_requested_(false)
+    , debug_mode_(false)
     , start_time_(std::chrono::system_clock::now())
     , log_rotation_enabled_(true)
     , log_rotation_active_(false)
@@ -207,6 +208,16 @@ bool DaemonTernaryFissionServer::initialize() {
     access_log_path_ = logging_config.access_log_path;
     error_log_path_ = logging_config.error_log_path;
     debug_log_path_ = logging_config.debug_log_path;
+
+    if (debug_mode_) {
+        std::ofstream dbg(debug_log_path_, std::ios::app);
+        if (dbg.is_open()) {
+            dbg << "config: pid_file=" << process_info_->pid_file_path
+                << " work_dir=" << process_info_->working_directory
+                << " log_level=" << logging_config.log_level
+                << std::endl;
+        }
+    }
     
     // We check if another instance is already running
     if (isAnotherInstanceRunning()) {
@@ -831,6 +842,18 @@ bool DaemonTernaryFissionServer::createLogDirectory(const std::string& log_path)
 void DaemonTernaryFissionServer::resourceMonitorWorker() {
     while (resource_monitoring_) {
         collectSystemMetrics();
+
+        if (debug_mode_) {
+            auto usage = getResourceUsage();
+            std::ofstream dbg(debug_log_path_, std::ios::app);
+            if (dbg.is_open()) {
+                dbg << "cpu_percent=" << usage["cpu_percent"]
+                    << " memory_bytes=" << usage["memory_bytes"]
+                    << " file_descriptors=" << usage["file_descriptors"]
+                    << std::endl;
+            }
+        }
+
         std::this_thread::sleep_for(monitoring_interval_);
     }
 }
@@ -934,16 +957,11 @@ void DaemonTernaryFissionServer::updateDaemonStatus(DaemonStatus new_status) {
  * We log daemon status changes
  * This method records status transitions for operational monitoring
  */
-void DaemonTernaryFissionServer::logStatusChange(DaemonStatus old_status, DaemonStatus new_status) {
-    std::cout << "Daemon status changed from " << getStatusString() << " to " << getStatusString() << std::endl;
-}
-
 /**
- * We get human-readable status string
- * This method converts status enum to readable string
+ * Convert status enum to readable string
  */
-std::string DaemonTernaryFissionServer::getStatusString() const {
-    switch (getStatus()) {
+std::string DaemonTernaryFissionServer::statusToString(DaemonStatus status) {
+    switch (status) {
         case DaemonStatus::STOPPED: return "STOPPED";
         case DaemonStatus::STARTING: return "STARTING";
         case DaemonStatus::RUNNING: return "RUNNING";
@@ -952,6 +970,19 @@ std::string DaemonTernaryFissionServer::getStatusString() const {
         case DaemonStatus::RESTARTING: return "RESTARTING";
         default: return "UNKNOWN";
     }
+}
+
+void DaemonTernaryFissionServer::logStatusChange(DaemonStatus old_status, DaemonStatus new_status) {
+    std::cout << "Daemon status changed from " << statusToString(old_status)
+              << " to " << statusToString(new_status) << std::endl;
+}
+
+/**
+ * We get human-readable status string
+ * This method converts current status enum to readable string
+ */
+std::string DaemonTernaryFissionServer::getStatusString() const {
+    return statusToString(getStatus());
 }
 
 /**
@@ -1108,7 +1139,17 @@ bool DaemonTernaryFissionServer::waitForShutdown(std::chrono::seconds timeout) c
 }
 
 void DaemonTernaryFissionServer::setDebugMode(bool enable_debug) {
-    // Debug mode implementation would adjust logging verbosity
+    debug_mode_.store(enable_debug, std::memory_order_relaxed);
+
+    // Adjust logging configuration through environment variable
+    const char* level = enable_debug ? "debug" : "info";
+    ::setenv("TERNARY_LOG_LEVEL", level, 1);
+
+    // Record debug mode change
+    std::ofstream dbg(debug_log_path_, std::ios::app);
+    if (dbg.is_open()) {
+        dbg << (enable_debug ? "Debug mode enabled" : "Debug mode disabled") << std::endl;
+    }
 }
 
 std::string DaemonTernaryFissionServer::getWorkingDirectory() const {
