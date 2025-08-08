@@ -149,6 +149,7 @@ private:
     std::unique_ptr<httplib::Server> http_server_;            // HTTP server instance
     std::unique_ptr<httplib::SSLServer> https_server_;        // HTTPS server instance
     std::shared_ptr<TernaryFissionSimulationEngine> simulation_engine_; // Physics engine
+    std::mutex simulation_mutex_;                // Simulation state synchronization
     
     // We maintain server state and configuration
     std::string bind_ip_;                       // Network binding IP address
