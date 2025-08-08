@@ -104,9 +104,7 @@ double calculateEntropy(std::size_t memory_bytes, std::uint64_t cpu_cycles);
  * @param momentum_tolerance: Allowed deviation in momentum conservation
  * @return: true if all conservation laws are satisfied within tolerance
  */
-bool verifyConservationLaws(const TernaryFissionEvent& event,
-                            double energy_tolerance,
-                            double momentum_tolerance);
+bool verifyConservationLaws(const TernaryFissionEvent& event, double energy_tolerance, double momentum_tolerance);
 
 /*
  * Allocate memory and CPU cycles to represent energy field
