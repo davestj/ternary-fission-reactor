@@ -315,6 +315,7 @@ bool ConfigurationManager::parseLoggingConfiguration() {
     logging_config_.max_log_file_size = getConfigInt("max_log_file_size", 104857600);
     logging_config_.log_rotation_count = getConfigInt("log_rotation_count", 10);
     logging_config_.enable_json_logging = getConfigBool("enable_json_logging", false);
+    logging_config_.verbose_output = getConfigBool("verbose_output", false);
     logging_config_.log_timestamp_format = getConfigValue("log_timestamp_format", "%Y-%m-%d %H:%M:%S");
     
     return true;
@@ -596,6 +597,11 @@ void ConfigurationManager::processEnvironmentOverrides() {
     std::string env_log_level = getEnvironmentVariable("TERNARY_LOG_LEVEL");
     if (!env_log_level.empty()) {
         logging_config_.log_level = env_log_level;
+    }
+
+    std::string env_verbose_output = getEnvironmentVariable("TERNARY_VERBOSE_OUTPUT");
+    if (!env_verbose_output.empty()) {
+        logging_config_.verbose_output = (env_verbose_output == "true" || env_verbose_output == "1");
     }
 }
 

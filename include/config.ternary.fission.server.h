@@ -133,6 +133,7 @@ struct LoggingConfiguration {
     int max_log_file_size = 104857600;         // Maximum log file size (100MB)
     int log_rotation_count = 10;               // Number of rotated log files to keep
     bool enable_json_logging = false;          // Enable structured JSON logging
+    bool verbose_output = false;               // Enable verbose logging output
     std::string log_timestamp_format = "%Y-%m-%d %H:%M:%S"; // Log timestamp format
 };
 
