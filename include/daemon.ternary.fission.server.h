@@ -1,22 +1,3 @@
-#ifndef DAEMON_TERNARY_FISSION_SERVER_H
-#define DAEMON_TERNARY_FISSION_SERVER_H
-
-#include <memory>
-
-#include "config.ternary.fission.server.h"
-
-namespace TernaryFission {
-
-class DaemonTernaryFissionServer {
-public:
-    DaemonTernaryFissionServer();
-    explicit DaemonTernaryFissionServer(std::shared_ptr<Configuration> config);
-
-    std::shared_ptr<Configuration> getConfiguration() const;
-
-private:
-    std::shared_ptr<Configuration> configuration_;
-
 /*
  * File: include/daemon.ternary.fission.server.h
  * Author: bthlops (David StJ)
@@ -283,6 +264,12 @@ public:
      * This method updates daemon configuration while maintaining operation
      */
     bool reloadConfiguration();
+
+    /**
+     * We get daemon configuration manager
+     * This method provides access to configuration management system
+     */
+    ConfigurationManager* getConfiguration() const;
     
     /**
      * We get daemon performance statistics
