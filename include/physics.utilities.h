@@ -100,9 +100,13 @@ double calculateEntropy(std::size_t memory_bytes, std::uint64_t cpu_cycles);
  * We check energy, momentum, mass, and charge conservation
  *
  * @param event: The fission event to verify
+ * @param energy_tolerance: Allowed deviation in energy conservation
+ * @param momentum_tolerance: Allowed deviation in momentum conservation
  * @return: true if all conservation laws are satisfied within tolerance
  */
-bool verifyConservationLaws(const TernaryFissionEvent& event);
+bool verifyConservationLaws(const TernaryFissionEvent& event,
+                            double energy_tolerance,
+                            double momentum_tolerance);
 
 /*
  * Allocate memory and CPU cycles to represent energy field
