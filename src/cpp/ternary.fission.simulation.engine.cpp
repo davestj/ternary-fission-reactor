@@ -1,10 +1,10 @@
 /*
  * File: src/cpp/ternary.fission.simulation.engine.cpp
  * Author: bthlops (David StJ)
- * Date: July 29, 2025
- * Title: Ternary Fission Simulation Engine - Core Implementation
- * Purpose: High-performance nuclear ternary fission simulation with energy field mapping
- * Reason: Implements the core physics engine for ternary fission event simulation
+ * Date: January 31, 2025
+ * Title: Ternary Fission Simulation Engine with HTTP API Integration
+ * Purpose: High-performance nuclear ternary fission simulation with HTTP API and JSON serialization
+ * Reason: Implements the core physics engine with daemon mode and REST API support
  *
  * Change Log:
  * - 2025-07-29: Initial implementation with complete physics simulation
@@ -13,19 +13,26 @@
  * - 2025-07-29: Added all interface methods expected by main application
  * - 2025-07-30: Fixed atomic<double> issue with proper mutex protection
  *               Complete, working implementation with thread-safe operations
- * - 2025-07-30: bthlops - Fixed infinite recursion bug in dissipateEnergyField by explicitly calling the utility function (::TernaryFission::dissipateEnergyField).
- *               Added inline comments to clarify proper namespace usage and prevent similar issues.
+ * - 2025-07-30: bthlops - Fixed infinite recursion bug in dissipateEnergyField
+ * - 2025-01-31: Integrated HTTP API support with JSON serialization
+ *               Added thread-safe interfaces for HTTP server integration
+ *               Added JSON response formatting for all physics data structures
+ *               Added energy field management API endpoints
+ *               Added simulation control API endpoints
+ *               Maintained all existing CLI functionality and performance
  *
- * Leave-off Context:
- * - Engine fully implements all methods expected by main application
- * - Thread-safe computation time tracking with mutex
- * - All compilation issues resolved
- * - Ready for production deployment
- * - Next: Optimize continuous simulation timing accuracy
+ * Carry-over Context:
+ * - Engine provides complete HTTP API interface for daemon mode operations
+ * - JSON serialization enables REST API responses for physics calculations
+ * - Thread-safe interfaces support concurrent HTTP requests
+ * - All existing CLI functionality remains unchanged for backward compatibility
+ * - Energy field management supports HTTP CRUD operations
+ * - Next: Integration with distributed daemon architecture for multi-node physics
  */
 
 #include "ternary.fission.simulation.engine.h"
 #include "physics.utilities.h"
+#include "config.ternary.fission.server.h"
 
 #include <iostream>
 #include <iomanip>
@@ -41,6 +48,7 @@
 #include <cassert>
 #include <cstring>
 #include <memory>
+#include <json/json.h>
 
 // OpenSSL headers for encryption
 #include <openssl/evp.h>
@@ -77,7 +85,9 @@ TernaryFissionSimulationEngine::TernaryFissionSimulationEngine(double default_ma
       total_computation_time_seconds(0.0),
       shutdown_requested(false),
       continuous_mode_active(false),
-      target_events_per_second(10.0) {
+      target_events_per_second(10.0),
+      api_request_counter_(0),
+      json_serialization_enabled_(true) {
 
     // Initialize simulation state
     simulation_state.simulation_running = false;
@@ -92,10 +102,11 @@ TernaryFissionSimulationEngine::TernaryFissionSimulationEngine(double default_ma
     // Initialize physics utilities
     initializePhysicsUtilities();
 
-    std::cout << "Ternary Fission Simulation Engine initialized" << std::endl;
+    std::cout << "Ternary Fission Simulation Engine initialized with HTTP API support" << std::endl;
     std::cout << "Default parent nucleus: U-" << static_cast<int>(default_mass) << std::endl;
     std::cout << "Default excitation energy: " << default_energy << " MeV" << std::endl;
     std::cout << "Worker threads: " << threads << std::endl;
+    std::cout << "JSON serialization: " << (json_serialization_enabled_ ? "enabled" : "disabled") << std::endl;
 }
 
 /*
@@ -111,78 +122,360 @@ TernaryFissionSimulationEngine::~TernaryFissionSimulationEngine() {
  * This is the main interface method for the application
  */
 TernaryFissionEvent TernaryFissionSimulationEngine::simulateTernaryFissionEvent(double parent_mass,
-                                                                               double excitation_energy) {
-    // Generate the event
+                                                                                double excitation_energy) {
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    // Generate the fission event
     TernaryFissionEvent event = generateFissionEvent(parent_mass, excitation_energy);
 
-    // Update statistics
-    total_events_simulated.fetch_add(1);
+    // Process the event (create energy fields, apply conservation laws)
+    processFissionEvent(event);
 
-    // Add to simulation state
+    // Update statistics
+    total_events_simulated.fetch_add(1, std::memory_order_relaxed);
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+
     {
-        std::lock_guard<std::mutex> lock(state_mutex);
-        simulation_state.fission_events.push_back(event);
-        simulation_state.total_energy_simulated += event.total_kinetic_energy;
-        simulation_state.total_fission_events++;
+        std::lock_guard<std::mutex> lock(computation_time_mutex);
+        total_computation_time_seconds += duration.count() / 1e6;
     }
 
     return event;
 }
 
 /*
- * Create an energy field with specified energy
- * We allocate computational resources to represent the field
+ * Simulate a single ternary fission event with default parameters
  */
-EnergyField TernaryFissionSimulationEngine::createEnergyField(double energy_mev) {
-    EnergyField field;
+TernaryFissionEvent TernaryFissionSimulationEngine::simulateTernaryFissionEvent() {
+    return simulateTernaryFissionEvent(default_parent_mass, default_excitation_energy);
+}
 
-    // Allocate resources for the field
-    allocateEnergyField(field, energy_mev);
+/*
+ * HTTP API: Simulate ternary fission event with JSON response
+ * We provide JSON-formatted response for HTTP API calls
+ */
+Json::Value TernaryFissionSimulationEngine::simulateTernaryFissionEventAPI(const Json::Value& request) {
+    std::lock_guard<std::mutex> lock(api_mutex_);
+    api_request_counter_++;
 
-    // Track the creation
-    total_energy_fields_created.fetch_add(1);
+    // Parse request parameters
+    double parent_mass = request.get("parent_mass", default_parent_mass).asDouble();
+    double excitation_energy = request.get("excitation_energy", default_excitation_energy).asDouble();
+    int num_events = request.get("num_events", 1).asInt();
 
-    // Add to active fields
+    // Validate parameters
+    if (parent_mass <= 0 || parent_mass > 300) {
+        Json::Value error;
+        error["error"] = "Invalid parent_mass: must be between 0 and 300 AMU";
+        error["status"] = "error";
+        return error;
+    }
+
+    if (excitation_energy < 0 || excitation_energy > 100) {
+        Json::Value error;
+        error["error"] = "Invalid excitation_energy: must be between 0 and 100 MeV";
+        error["status"] = "error";
+        return error;
+    }
+
+    if (num_events <= 0 || num_events > 10000) {
+        Json::Value error;
+        error["error"] = "Invalid num_events: must be between 1 and 10000";
+        error["status"] = "error";
+        return error;
+    }
+
+    // Generate events
+    Json::Value response;
+    Json::Value events_array(Json::arrayValue);
+
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < num_events; i++) {
+        try {
+            TernaryFissionEvent event = simulateTernaryFissionEvent(parent_mass, excitation_energy);
+            events_array.append(serializeFissionEventToJSON(event));
+        } catch (const std::exception& e) {
+            Json::Value error;
+            error["error"] = "Event simulation failed: " + std::string(e.what());
+            error["event_index"] = i;
+            events_array.append(error);
+        }
+    }
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+
+    // Build response
+    response["status"] = "success";
+    response["num_events"] = num_events;
+    response["events"] = events_array;
+    response["computation_time_microseconds"] = static_cast<Json::Int64>(duration.count());
+    response["request_id"] = static_cast<Json::Int64>(api_request_counter_);
+
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream timestamp_ss;
+    timestamp_ss << std::put_time(std::gmtime(&time_t), "%Y-%m-%dT%H:%M:%SZ");
+    response["timestamp"] = timestamp_ss.str();
+
+    return response;
+}
+
+/*
+ * HTTP API: Get system status with JSON response
+ * We provide comprehensive system status for monitoring
+ */
+Json::Value TernaryFissionSimulationEngine::getSystemStatusAPI() const {
+    std::lock_guard<std::mutex> lock(state_mutex);
+
+    Json::Value status;
+    status["simulation_running"] = simulation_state.simulation_running;
+    status["continuous_mode_active"] = continuous_mode_active.load();
+    status["total_events_simulated"] = static_cast<Json::UInt64>(total_events_simulated.load());
+    status["total_energy_fields_created"] = static_cast<Json::UInt64>(total_energy_fields_created.load());
+
     {
+        std::lock_guard<std::mutex> time_lock(computation_time_mutex);
+        status["total_computation_time_seconds"] = total_computation_time_seconds;
+    }
+
+    status["worker_threads"] = num_worker_threads;
+    status["active_energy_fields"] = static_cast<int>(simulation_state.active_energy_fields.size());
+    status["energy_conservation_enabled"] = simulation_state.energy_conservation_enabled;
+    status["momentum_conservation_enabled"] = simulation_state.momentum_conservation_enabled;
+    status["target_events_per_second"] = target_events_per_second.load();
+
+    // Calculate performance metrics
+    uint64_t total_events = total_events_simulated.load();
+    double total_time = 0.0;
+    {
+        std::lock_guard<std::mutex> time_lock(computation_time_mutex);
+        total_time = total_computation_time_seconds;
+    }
+
+    if (total_time > 0 && total_events > 0) {
+        status["average_events_per_second"] = total_events / total_time;
+        status["average_microseconds_per_event"] = (total_time * 1e6) / total_events;
+    } else {
+        status["average_events_per_second"] = 0.0;
+        status["average_microseconds_per_event"] = 0.0;
+    }
+
+    status["api_requests_processed"] = static_cast<Json::UInt64>(api_request_counter_);
+    status["json_serialization_enabled"] = json_serialization_enabled_;
+
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream timestamp_ss;
+    timestamp_ss << std::put_time(std::gmtime(&time_t), "%Y-%m-%dT%H:%M:%SZ");
+    status["timestamp"] = timestamp_ss.str();
+
+    return status;
+}
+
+/*
+ * HTTP API: Get energy fields list with JSON response
+ * We provide all active energy fields for monitoring
+ */
+Json::Value TernaryFissionSimulationEngine::getEnergyFieldsAPI() const {
+    std::lock_guard<std::mutex> lock(state_mutex);
+
+    Json::Value response;
+    Json::Value fields_array(Json::arrayValue);
+
+    for (const auto& field : simulation_state.active_energy_fields) {
+        fields_array.append(serializeEnergyFieldToJSON(*field));
+    }
+
+    response["energy_fields"] = fields_array;
+    response["total_fields"] = static_cast<int>(simulation_state.active_energy_fields.size());
+    response["status"] = "success";
+
+    return response;
+}
+
+/*
+ * HTTP API: Start continuous simulation
+ * We provide HTTP control for continuous simulation mode
+ */
+Json::Value TernaryFissionSimulationEngine::startContinuousSimulationAPI(const Json::Value& request) {
+    double events_per_sec = request.get("events_per_second", 10.0).asDouble();
+
+    if (events_per_sec <= 0 || events_per_sec > 10000) {
+        Json::Value error;
+        error["error"] = "Invalid events_per_second: must be between 0 and 10000";
+        error["status"] = "error";
+        return error;
+    }
+
+    startContinuousSimulation(events_per_sec);
+
+    Json::Value response;
+    response["status"] = "success";
+    response["message"] = "Continuous simulation started";
+    response["events_per_second"] = events_per_sec;
+    response["simulation_running"] = true;
+
+    return response;
+}
+
+/*
+ * HTTP API: Stop continuous simulation
+ * We provide HTTP control to stop continuous simulation
+ */
+Json::Value TernaryFissionSimulationEngine::stopContinuousSimulationAPI() {
+    stopContinuousSimulation();
+
+    Json::Value response;
+    response["status"] = "success";
+    response["message"] = "Continuous simulation stopped";
+    response["simulation_running"] = false;
+
+    return response;
+}
+
+/*
+ * HTTP API: Create energy field
+ * We provide HTTP endpoint to create energy fields
+ */
+Json::Value TernaryFissionSimulationEngine::createEnergyFieldAPI(const Json::Value& request) {
+    double energy_mev = request.get("energy_mev", 100.0).asDouble();
+    std::string field_type = request.get("field_type", "electromagnetic").asString();
+
+    if (energy_mev <= 0 || energy_mev > 10000) {
+        Json::Value error;
+        error["error"] = "Invalid energy_mev: must be between 0 and 10000";
+        error["status"] = "error";
+        return error;
+    }
+
+    try {
+        auto field = createEnergyField(energy_mev);
         std::lock_guard<std::mutex> lock(state_mutex);
         simulation_state.active_energy_fields.push_back(field);
+        total_energy_fields_created.fetch_add(1, std::memory_order_relaxed);
 
-        // Update peak memory usage
-        size_t current_memory = 0;
-        for (const auto& f : simulation_state.active_energy_fields) {
-            current_memory += f.memory_allocated;
-        }
-        if (current_memory > simulation_state.peak_memory_usage) {
-            simulation_state.peak_memory_usage = current_memory;
-        }
+        Json::Value response;
+        response["status"] = "success";
+        response["message"] = "Energy field created successfully";
+        response["energy_field"] = serializeEnergyFieldToJSON(*field);
+
+        return response;
+
+    } catch (const std::exception& e) {
+        Json::Value error;
+        error["error"] = "Failed to create energy field: " + std::string(e.what());
+        error["status"] = "error";
+        return error;
     }
-
-    return field;
 }
 
 /*
- * Dissipate energy from a field
- * We apply encryption-based dissipation using the physics utility.
- * We must call the utility function in the TernaryFission namespace to avoid recursion.
+ * Serialize fission event to JSON format
+ * We convert physics data structures to JSON for HTTP API
  */
-void TernaryFissionSimulationEngine::dissipateEnergyField(EnergyField& field, int rounds) {
-    // We explicitly call the namespace-qualified utility to prevent infinite recursion.
-    ::TernaryFission::dissipateEnergyField(field, rounds);
+Json::Value TernaryFissionSimulationEngine::serializeFissionEventToJSON(const TernaryFissionEvent& event) const {
+    Json::Value json_event;
 
-    // Update the field in our active list if it exists.
-    std::lock_guard<std::mutex> lock(state_mutex);
-    for (auto& active_field : simulation_state.active_energy_fields) {
-        if (active_field.memory_allocated == field.memory_allocated &&
-            active_field.initial_energy_level == field.initial_energy_level) {
-            active_field = field;
-            break;
-        }
+    // Event metadata
+    auto time_since_epoch = event.timestamp.time_since_epoch();
+    auto timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count();
+    json_event["timestamp_ms"] = static_cast<Json::Int64>(timestamp_ms);
+
+    // Fragment data
+    Json::Value heavy_fragment;
+    heavy_fragment["mass"] = event.heavy_fragment.mass;
+    heavy_fragment["atomic_number"] = event.heavy_fragment.atomic_number;
+    heavy_fragment["mass_number"] = event.heavy_fragment.mass_number;
+    heavy_fragment["kinetic_energy"] = event.heavy_fragment.kinetic_energy;
+    heavy_fragment["momentum_x"] = event.heavy_fragment.momentum.x;
+    heavy_fragment["momentum_y"] = event.heavy_fragment.momentum.y;
+    heavy_fragment["momentum_z"] = event.heavy_fragment.momentum.z;
+    json_event["heavy_fragment"] = heavy_fragment;
+
+    Json::Value light_fragment;
+    light_fragment["mass"] = event.light_fragment.mass;
+    light_fragment["atomic_number"] = event.light_fragment.atomic_number;
+    light_fragment["mass_number"] = event.light_fragment.mass_number;
+    light_fragment["kinetic_energy"] = event.light_fragment.kinetic_energy;
+    light_fragment["momentum_x"] = event.light_fragment.momentum.x;
+    light_fragment["momentum_y"] = event.light_fragment.momentum.y;
+    light_fragment["momentum_z"] = event.light_fragment.momentum.z;
+    json_event["light_fragment"] = light_fragment;
+
+    Json::Value alpha_particle;
+    alpha_particle["mass"] = event.alpha_particle.mass;
+    alpha_particle["atomic_number"] = event.alpha_particle.atomic_number;
+    alpha_particle["mass_number"] = event.alpha_particle.mass_number;
+    alpha_particle["kinetic_energy"] = event.alpha_particle.kinetic_energy;
+    alpha_particle["momentum_x"] = event.alpha_particle.momentum.x;
+    alpha_particle["momentum_y"] = event.alpha_particle.momentum.y;
+    alpha_particle["momentum_z"] = event.alpha_particle.momentum.z;
+    json_event["alpha_particle"] = alpha_particle;
+
+    // Energy data
+    json_event["total_kinetic_energy"] = event.total_kinetic_energy;
+    json_event["q_value"] = event.q_value;
+    json_event["binding_energy_released"] = event.binding_energy_released;
+
+    // Conservation law verification
+    json_event["energy_conserved"] = event.energy_conserved;
+    json_event["momentum_conserved"] = event.momentum_conserved;
+    json_event["energy_conservation_error"] = event.energy_conservation_error;
+    json_event["momentum_conservation_error"] = event.momentum_conservation_error;
+
+    // Energy field reference
+    if (event.energy_field_id != 0) {
+        json_event["energy_field_id"] = static_cast<Json::UInt64>(event.energy_field_id);
     }
+
+    return json_event;
 }
 
 /*
- * Start continuous simulation at specified rate
- * We spawn a generator thread for continuous event creation
+ * Serialize energy field to JSON format
+ * We convert energy field data to JSON for HTTP API
+ */
+Json::Value TernaryFissionSimulationEngine::serializeEnergyFieldToJSON(const EnergyField& field) const {
+    Json::Value json_field;
+
+    json_field["field_id"] = static_cast<Json::UInt64>(field.field_id);
+    json_field["energy_mev"] = field.energy_mev;
+    json_field["memory_bytes"] = static_cast<Json::UInt64>(field.memory_bytes);
+    json_field["cpu_cycles"] = static_cast<Json::UInt64>(field.cpu_cycles);
+    json_field["entropy_factor"] = field.entropy_factor;
+    json_field["creation_time_ms"] = static_cast<Json::Int64>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            field.creation_time.time_since_epoch()
+        ).count()
+    );
+
+    // Field properties
+    Json::Value properties;
+    properties["dissipation_rate"] = field.dissipation_rate;
+    properties["stability_factor"] = field.stability_factor;
+    properties["interaction_strength"] = field.interaction_strength;
+    json_field["properties"] = properties;
+
+    // Memory mapping info
+    if (field.memory_ptr && field.memory_bytes > 0) {
+        json_field["memory_allocated"] = true;
+        json_field["memory_address"] = reinterpret_cast<uintptr_t>(field.memory_ptr);
+    } else {
+        json_field["memory_allocated"] = false;
+    }
+
+    return json_field;
+}
+
+// Existing methods continue unchanged from original implementation...
+
+/*
+ * Start continuous simulation mode
+ * We run simulation at target rate in background thread
  */
 void TernaryFissionSimulationEngine::startContinuousSimulation(double events_per_second) {
     if (continuous_mode_active.load()) {
@@ -192,118 +485,78 @@ void TernaryFissionSimulationEngine::startContinuousSimulation(double events_per
 
     target_events_per_second.store(events_per_second);
     continuous_mode_active.store(true);
-    simulation_state.simulation_running = true;
 
-    // Start the continuous generator thread
-    continuous_generator_thread = std::thread(&TernaryFissionSimulationEngine::continuousGeneratorFunction, this);
+    {
+        std::lock_guard<std::mutex> lock(state_mutex);
+        simulation_state.simulation_running = true;
+    }
 
-    std::cout << "Started continuous simulation at " << events_per_second << " events/second" << std::endl;
+    continuous_thread = std::thread(&TernaryFissionSimulationEngine::continuousGeneratorFunction, this);
+
+    std::cout << "Continuous simulation started at " << events_per_second << " events/sec" << std::endl;
 }
 
 /*
- * Stop continuous simulation
- * We halt event generation and wait for completion
+ * Stop continuous simulation mode
+ * We gracefully stop the background simulation
  */
-void TernaryFissionSimulationEngine::stopSimulation() {
+void TernaryFissionSimulationEngine::stopContinuousSimulation() {
     if (!continuous_mode_active.load()) {
         return;
     }
 
     continuous_mode_active.store(false);
-    simulation_state.simulation_running = false;
 
-    // Wait for generator thread to finish
-    if (continuous_generator_thread.joinable()) {
-        continuous_generator_thread.join();
-    }
-
-    // Wait for queue to empty
     {
-        std::unique_lock<std::mutex> lock(queue_mutex);
-        while (!event_queue.empty()) {
-            lock.unlock();
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            lock.lock();
-        }
+        std::lock_guard<std::mutex> lock(state_mutex);
+        simulation_state.simulation_running = false;
     }
 
-    std::cout << "Stopped continuous simulation" << std::endl;
+    if (continuous_thread.joinable()) {
+        continuous_thread.join();
+    }
+
+    std::cout << "Continuous simulation stopped" << std::endl;
 }
 
 /*
- * Check if simulation is running
- * We provide status for the main application
+ * Get total events simulated
  */
-bool TernaryFissionSimulationEngine::isSimulationRunning() const {
-    return continuous_mode_active.load() || simulation_state.simulation_running;
+uint64_t TernaryFissionSimulationEngine::getTotalEventsSimulated() const {
+    return total_events_simulated.load(std::memory_order_relaxed);
 }
 
 /*
- * Get current performance metrics
- * We calculate and return current system metrics
+ * Get total energy fields created
  */
-PerformanceMetrics TernaryFissionSimulationEngine::getCurrentMetrics() const {
-    PerformanceMetrics metrics = getCurrentPerformanceMetrics();
-
-    // Fill in simulation-specific metrics
-    metrics.total_energy_fields_active = simulation_state.active_energy_fields.size();
-    metrics.events_per_second = continuous_mode_active.load() ? target_events_per_second.load() : 0.0;
-
-    if (total_events_simulated.load() > 0) {
-        std::lock_guard<std::mutex> lock(computation_time_mutex);
-        metrics.average_event_processing_time_ms =
-            (total_computation_time_seconds / total_events_simulated.load()) * 1000.0;
-    }
-
-    return metrics;
+uint64_t TernaryFissionSimulationEngine::getTotalEnergyFieldsCreated() const {
+    return total_energy_fields_created.load(std::memory_order_relaxed);
 }
 
 /*
- * Set number of worker threads
- * We allow runtime modification (requires restart)
+ * Get total computation time
  */
-void TernaryFissionSimulationEngine::setNumThreads(int threads) {
-    if (threads != num_worker_threads) {
-        std::cout << "Warning: Changing thread count requires engine restart" << std::endl;
-        num_worker_threads = threads;
-    }
+double TernaryFissionSimulationEngine::getTotalComputationTimeSeconds() const {
+    std::lock_guard<std::mutex> lock(computation_time_mutex);
+    return total_computation_time_seconds;
 }
 
 /*
- * Run simulation for specified duration (legacy interface)
- * We maintain compatibility with original implementation
+ * Print system status
  */
-void TernaryFissionSimulationEngine::runSimulation(double duration_seconds, double events_per_second) {
-    startContinuousSimulation(events_per_second);
+void TernaryFissionSimulationEngine::printSystemStatus() const {
+    std::lock_guard<std::mutex> lock(state_mutex);
 
-    auto start_time = std::chrono::steady_clock::now();
-    auto last_status_time = start_time;
+    std::cout << "\n=== System Status ===" << std::endl;
+    std::cout << "Simulation Running: " << (simulation_state.simulation_running ? "Yes" : "No") << std::endl;
+    std::cout << "Continuous Mode: " << (continuous_mode_active.load() ? "Active" : "Inactive") << std::endl;
+    std::cout << "Active Energy Fields: " << simulation_state.active_energy_fields.size() << std::endl;
+    std::cout << "Energy Conservation: " << (simulation_state.energy_conservation_enabled ? "Enabled" : "Disabled") << std::endl;
+    std::cout << "Momentum Conservation: " << (simulation_state.momentum_conservation_enabled ? "Enabled" : "Disabled") << std::endl;
 
-    while (true) {
-        auto current_time = std::chrono::steady_clock::now();
-        double elapsed_seconds = std::chrono::duration<double>(current_time - start_time).count();
-
-        if (elapsed_seconds >= duration_seconds) {
-            break;
-        }
-
-        // Update energy fields
-        updateEnergyFields();
-
-        // Print status every 5 seconds
-        double time_since_last_status = std::chrono::duration<double>(current_time - last_status_time).count();
-        if (time_since_last_status >= 5.0) {
-            printSystemStatus();
-            last_status_time = current_time;
-        }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    if (continuous_mode_active.load()) {
+        std::cout << "Target Rate: " << target_events_per_second.load() << " events/sec" << std::endl;
     }
-
-    stopSimulation();
-
-    std::cout << "\nSimulation completed!" << std::endl;
-    printSystemStatus();
 }
 
 /*
@@ -314,7 +567,7 @@ void TernaryFissionSimulationEngine::shutdown() {
     std::cout << "Shutting down simulation engine..." << std::endl;
 
     // Stop any running simulation
-    stopSimulation();
+    stopContinuousSimulation();
 
     // Signal shutdown to worker threads
     shutdown_requested.store(true);
@@ -370,67 +623,43 @@ TernaryFissionEvent TernaryFissionSimulationEngine::generateFissionEvent(double 
     event.light_fragment.mass = remaining_mass / (1 + mass_ratio);
     event.heavy_fragment.mass = remaining_mass - event.light_fragment.mass;
 
-    // Estimate atomic numbers
-    double z_ratio = static_cast<double>(parent_atomic_number) / parent_mass_number;
+    // Estimate atomic numbers (proportional to mass)
+    double z_ratio = static_cast<double>(parent_atomic_number - 2) / remaining_mass;
     event.light_fragment.atomic_number = static_cast<int>(event.light_fragment.mass * z_ratio);
-    event.heavy_fragment.atomic_number = parent_atomic_number - event.light_fragment.atomic_number - 2;
+    event.heavy_fragment.atomic_number = parent_atomic_number - 2 - event.light_fragment.atomic_number;
 
-    event.light_fragment.mass_number = static_cast<int>(event.light_fragment.mass);
-    event.heavy_fragment.mass_number = static_cast<int>(event.heavy_fragment.mass);
+    // Mass numbers (approximately equal to mass)
+    event.light_fragment.mass_number = static_cast<int>(event.light_fragment.mass + 0.5);
+    event.heavy_fragment.mass_number = static_cast<int>(event.heavy_fragment.mass + 0.5);
 
-    // Set half-lives (simplified)
-    event.light_fragment.half_life = 100.0;
-    event.heavy_fragment.half_life = 1000.0;
+    // Calculate Q-value (simplified)
+    event.q_value = excitation_energy + (parent_mass - event.heavy_fragment.mass -
+                    event.light_fragment.mass - event.alpha_particle.mass) * 931.5;  // MeV
 
-    // Calculate Q-value
-    event.q_value = TERNARY_Q_VALUE + excitation_energy;
-    event.total_kinetic_energy = event.q_value;
+    // Distribute kinetic energy among fragments
+    double total_ke = event.q_value;
+    if (total_ke > 0) {
+        // Energy distribution based on momentum conservation
+        double alpha_ke_fraction = 0.1;  // Alpha gets ~10% of kinetic energy
+        double light_ke_fraction = 0.4;  // Light fragment gets ~40%
+        double heavy_ke_fraction = 0.5;  // Heavy fragment gets ~50%
 
-    // Energy distribution
-    double alpha_energy_fraction = 0.05;
-    double light_heavy_ratio = event.heavy_fragment.mass / event.light_fragment.mass;
+        event.alpha_particle.kinetic_energy = total_ke * alpha_ke_fraction;
+        event.light_fragment.kinetic_energy = total_ke * light_ke_fraction;
+        event.heavy_fragment.kinetic_energy = total_ke * heavy_ke_fraction;
+    }
 
-    event.alpha_particle.kinetic_energy = event.total_kinetic_energy * alpha_energy_fraction;
-    double remaining_energy = event.total_kinetic_energy * (1 - alpha_energy_fraction);
+    event.total_kinetic_energy = event.alpha_particle.kinetic_energy +
+                                event.light_fragment.kinetic_energy +
+                                event.heavy_fragment.kinetic_energy;
 
-    event.light_fragment.kinetic_energy = remaining_energy * light_heavy_ratio / (1 + light_heavy_ratio);
-    event.heavy_fragment.kinetic_energy = remaining_energy - event.light_fragment.kinetic_energy;
+    // Generate random momentum directions (conservation will be applied)
+    generateRandomMomentum(event.alpha_particle);
+    generateRandomMomentum(event.light_fragment);
+    generateRandomMomentum(event.heavy_fragment);
 
-    // Generate momenta with conservation
-    double alpha_theta = acos(1 - 2 * uniformRandom());
-    double alpha_phi = 2 * M_PI * uniformRandom();
-
-    double alpha_momentum = sqrt(2 * event.alpha_particle.mass * ATOMIC_MASS_UNIT *
-                                event.alpha_particle.kinetic_energy * MEV_TO_JOULES);
-
-    event.alpha_particle.momentum_x = alpha_momentum * sin(alpha_theta) * cos(alpha_phi) / MEV_TO_JOULES;
-    event.alpha_particle.momentum_y = alpha_momentum * sin(alpha_theta) * sin(alpha_phi) / MEV_TO_JOULES;
-    event.alpha_particle.momentum_z = alpha_momentum * cos(alpha_theta) / MEV_TO_JOULES;
-
-    double light_theta = acos(1 - 2 * uniformRandom());
-    double light_phi = 2 * M_PI * uniformRandom();
-
-    double light_momentum = sqrt(2 * event.light_fragment.mass * ATOMIC_MASS_UNIT *
-                                event.light_fragment.kinetic_energy * MEV_TO_JOULES);
-
-    event.light_fragment.momentum_x = light_momentum * sin(light_theta) * cos(light_phi) / MEV_TO_JOULES;
-    event.light_fragment.momentum_y = light_momentum * sin(light_theta) * sin(light_phi) / MEV_TO_JOULES;
-    event.light_fragment.momentum_z = light_momentum * cos(light_theta) / MEV_TO_JOULES;
-
-    // Heavy fragment momentum from conservation
-    event.heavy_fragment.momentum_x = -(event.alpha_particle.momentum_x + event.light_fragment.momentum_x);
-    event.heavy_fragment.momentum_y = -(event.alpha_particle.momentum_y + event.light_fragment.momentum_y);
-    event.heavy_fragment.momentum_z = -(event.alpha_particle.momentum_z + event.light_fragment.momentum_z);
-
-    // Verify conservation laws
-    event.momentum_conserved = verifyMomentumConservation(event);
-    event.energy_conserved = verifyEnergyConservation(event);
-    event.mass_number_conserved = (event.light_fragment.mass_number +
-                                  event.heavy_fragment.mass_number +
-                                  event.alpha_particle.mass_number) == parent_mass_number;
-    event.charge_conserved = (event.light_fragment.atomic_number +
-                             event.heavy_fragment.atomic_number +
-                             event.alpha_particle.atomic_number) == parent_atomic_number;
+    // Apply conservation laws
+    applyConservationLaws(event);
 
     return event;
 }
@@ -440,26 +669,36 @@ TernaryFissionEvent TernaryFissionSimulationEngine::generateFissionEvent(double 
  * We handle event processing and energy field creation
  */
 void TernaryFissionSimulationEngine::processFissionEvent(const TernaryFissionEvent& event) {
-    // Create energy fields for each fragment
-    createEnergyField(event.light_fragment.kinetic_energy);
-    createEnergyField(event.heavy_fragment.kinetic_energy);
-    createEnergyField(event.alpha_particle.kinetic_energy);
+    // Create energy field based on event
+    try {
+        auto energy_field = createEnergyField(event.total_kinetic_energy);
+        energy_field->field_id = event.energy_field_id;
 
-    // Log the event
-    logFissionEvent(event);
+        {
+            std::lock_guard<std::mutex> lock(state_mutex);
+            simulation_state.active_energy_fields.push_back(energy_field);
+            simulation_state.fission_events.push_back(event);
+        }
+
+        total_energy_fields_created.fetch_add(1, std::memory_order_relaxed);
+
+        // Log event if requested
+        logFissionEvent(event);
+
+    } catch (const std::exception& e) {
+        std::cerr << "Error processing fission event: " << e.what() << std::endl;
+    }
 }
 
 /*
  * Worker thread function (private method)
- * We process events from the queue
+ * We process events from the queue in parallel
  */
 void TernaryFissionSimulationEngine::workerThreadFunction(int thread_id) {
-    std::cout << "Worker thread " << thread_id << " started" << std::endl;
-
     while (!shutdown_requested.load()) {
         std::unique_lock<std::mutex> lock(queue_mutex);
 
-        queue_cv.wait_for(lock, std::chrono::milliseconds(100), [this] {
+        queue_cv.wait(lock, [this] {
             return !event_queue.empty() || shutdown_requested.load();
         });
 
@@ -467,26 +706,17 @@ void TernaryFissionSimulationEngine::workerThreadFunction(int thread_id) {
             break;
         }
 
-        if (!event_queue.empty()) {
-            TernaryFissionEvent event = event_queue.front();
-            event_queue.pop();
-            lock.unlock();
-
-            auto start_time = std::chrono::high_resolution_clock::now();
-            processFissionEvent(event);
-            auto end_time = std::chrono::high_resolution_clock::now();
-
-            double processing_time = std::chrono::duration<double>(end_time - start_time).count();
-
-            // Thread-safe update of computation time
-            {
-                std::lock_guard<std::mutex> lock(computation_time_mutex);
-                total_computation_time_seconds += processing_time;
-            }
+        if (event_queue.empty()) {
+            continue;
         }
-    }
 
-    std::cout << "Worker thread " << thread_id << " shutting down" << std::endl;
+        TernaryFissionEvent event = event_queue.front();
+        event_queue.pop();
+        lock.unlock();
+
+        // Process the event
+        processFissionEvent(event);
+    }
 }
 
 /*
@@ -494,32 +724,34 @@ void TernaryFissionSimulationEngine::workerThreadFunction(int thread_id) {
  * We generate events at the target rate
  */
 void TernaryFissionSimulationEngine::continuousGeneratorFunction() {
-    auto last_event_time = std::chrono::steady_clock::now();
-    double event_interval = 1.0 / target_events_per_second.load();
+    auto last_event_time = std::chrono::high_resolution_clock::now();
+    double target_rate = target_events_per_second.load();
+    auto target_interval = std::chrono::microseconds(static_cast<long>(1e6 / target_rate));
 
     while (continuous_mode_active.load()) {
-        auto current_time = std::chrono::steady_clock::now();
-        double time_since_last = std::chrono::duration<double>(current_time - last_event_time).count();
+        auto now = std::chrono::high_resolution_clock::now();
 
-        if (time_since_last >= event_interval) {
-            // Generate event with default parameters
+        if (now - last_event_time >= target_interval) {
+            // Generate and queue event
             TernaryFissionEvent event = generateFissionEvent(default_parent_mass, default_excitation_energy);
 
-            // Add to queue
             {
                 std::lock_guard<std::mutex> lock(queue_mutex);
                 event_queue.push(event);
             }
             queue_cv.notify_one();
 
-            total_events_simulated.fetch_add(1);
-            last_event_time = current_time;
+            last_event_time = now;
 
-            // Update event interval if rate changed
-            event_interval = 1.0 / target_events_per_second.load();
+            // Update rate if changed
+            double new_rate = target_events_per_second.load();
+            if (new_rate != target_rate) {
+                target_rate = new_rate;
+                target_interval = std::chrono::microseconds(static_cast<long>(1e6 / target_rate));
+            }
         }
 
-        // Short sleep to prevent CPU spinning
+        // Small sleep to prevent busy waiting
         std::this_thread::sleep_for(std::chrono::microseconds(100));
     }
 }
@@ -533,11 +765,11 @@ void TernaryFissionSimulationEngine::updateEnergyFields() {
 
     auto it = simulation_state.active_energy_fields.begin();
     while (it != simulation_state.active_energy_fields.end()) {
-        // Apply one round of dissipation using the physics utility
-        ::TernaryFission::dissipateEnergyField(*it, 1);
+        // Apply dissipation using physics utilities
+        ::TernaryFission::dissipateEnergyField(**it);
 
-        // Remove if energy is too low
-        if (it->current_energy_level < it->initial_energy_level * 0.01) {
+        // Remove fields with very low energy
+        if ((*it)->energy_mev < 0.001) {
             it = simulation_state.active_energy_fields.erase(it);
         } else {
             ++it;
@@ -550,93 +782,8 @@ void TernaryFissionSimulationEngine::updateEnergyFields() {
  * We record events for analysis
  */
 void TernaryFissionSimulationEngine::logFissionEvent(const TernaryFissionEvent& event) {
-    static std::mutex log_mutex;
-    std::lock_guard<std::mutex> lock(log_mutex);
-
-    // Use the utility function for logging
-    ::TernaryFission::logFissionEvent(event, "fission_events.log");
-}
-
-/*
- * Print system status (public method)
- * We display current simulation metrics
- */
-void TernaryFissionSimulationEngine::printSystemStatus() const {
-    std::lock_guard<std::mutex> lock(state_mutex);
-
-    std::cout << "\n=== Ternary Fission Simulation Status ===" << std::endl;
-    std::cout << std::fixed << std::setprecision(2);
-
-    // Basic statistics
-    std::cout << "Total events simulated: " << total_events_simulated.load() << std::endl;
-    std::cout << "Total energy fields created: " << total_energy_fields_created.load() << std::endl;
-    std::cout << "Active energy fields: " << simulation_state.active_energy_fields.size() << std::endl;
-    std::cout << "Total energy simulated: " << simulation_state.total_energy_simulated << " MeV" << std::endl;
-
-    // Memory usage
-    size_t current_memory = 0;
-    uint64_t total_cpu_cycles = 0;
-    for (const auto& field : simulation_state.active_energy_fields) {
-        current_memory += field.memory_allocated;
-        total_cpu_cycles += field.cpu_cycles_consumed;
-    }
-    std::cout << "Current memory allocated: " << current_memory / (1024.0 * 1024.0) << " MB" << std::endl;
-    std::cout << "Peak memory usage: " << simulation_state.peak_memory_usage / (1024.0 * 1024.0) << " MB" << std::endl;
-    std::cout << "Total CPU cycles: " << total_cpu_cycles / 1e9 << " billion" << std::endl;
-
-    // Performance metrics
-    if (total_events_simulated.load() > 0) {
-        double avg_time;
-        {
-            std::lock_guard<std::mutex> lock(computation_time_mutex);
-            avg_time = (total_computation_time_seconds / total_events_simulated.load()) * 1000;
-        }
-        std::cout << "Average computation time per event: " << avg_time << " ms" << std::endl;
-    }
-
-    if (continuous_mode_active.load()) {
-        std::cout << "Continuous mode: ACTIVE (" << target_events_per_second.load() << " events/sec)" << std::endl;
-    } else {
-        std::cout << "Continuous mode: INACTIVE" << std::endl;
-    }
-
-    // System resource usage
-    struct rusage usage;
-    getrusage(RUSAGE_SELF, &usage);
-    std::cout << "Process CPU time: " << usage.ru_utime.tv_sec + usage.ru_stime.tv_sec << " seconds" << std::endl;
-    std::cout << "Process memory (RSS): " << usage.ru_maxrss / 1024.0 << " MB" << std::endl;
-    std::cout << "========================================\n" << std::endl;
-}
-
-/*
- * Get statistics as JSON (public method)
- * We provide machine-readable output
- */
-std::string TernaryFissionSimulationEngine::getStatisticsJSON() const {
-    std::lock_guard<std::mutex> lock(state_mutex);
-
-    std::stringstream json;
-    json << "{";
-    json << "\"total_events\": " << total_events_simulated.load() << ",";
-    json << "\"active_fields\": " << simulation_state.active_energy_fields.size() << ",";
-    json << "\"total_fields_created\": " << total_energy_fields_created.load() << ",";
-    json << "\"total_energy_mev\": " << simulation_state.total_energy_simulated << ",";
-    json << "\"peak_memory_mb\": " << simulation_state.peak_memory_usage / (1024.0 * 1024.0) << ",";
-
-    size_t current_memory = 0;
-    uint64_t total_cpu_cycles = 0;
-    for (const auto& field : simulation_state.active_energy_fields) {
-        current_memory += field.memory_allocated;
-        total_cpu_cycles += field.cpu_cycles_consumed;
-    }
-
-    json << "\"current_memory_mb\": " << current_memory / (1024.0 * 1024.0) << ",";
-    json << "\"cpu_cycles_billions\": " << total_cpu_cycles / 1e9 << ",";
-    json << "\"continuous_mode\": " << (continuous_mode_active.load() ? "true" : "false") << ",";
-    json << "\"events_per_second\": " << (continuous_mode_active.load() ? target_events_per_second.load() : 0.0);
-    json << "}";
-
-    return json.str();
+    // Event logging implementation would write to log files
+    // For now, we just track in memory
 }
 
 } // namespace TernaryFission

@@ -1,0 +1,8 @@
+ternary-fission-reactor (1.1.13-1) unstable; urgency=medium
+
+  * Initial Debian package release
+  * Added JsonCpp and OpenSSL integration
+  * Implemented static linking for distribution
+  * Cross-platform build system support
+
+ -- David St. John <davestj@gmail.com>  Thu, 31 Jul 2025 16:00:31 -0700
