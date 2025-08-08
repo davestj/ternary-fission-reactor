@@ -989,8 +989,106 @@ void HTTPTernaryFissionServer::handleEnergyFieldGet(const httplib::Request& req,
 }
 
 void HTTPTernaryFissionServer::handleEnergyFieldUpdate(const httplib::Request& req, httplib::Response& res) {
-    sendErrorResponse(res, 501, "Energy field update not yet implemented");
-    metrics_->incrementErrors();
+    std::string field_id = req.matches[1];
+
+    Json::Value request_json;
+    if (!parseJSONRequest(req, request_json)) {
+        sendErrorResponse(res, 400, "Invalid JSON request body");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(fields_mutex_);
+    auto it = energy_fields_.find(field_id);
+    if (it == energy_fields_.end()) {
+        sendErrorResponse(res, 404, "Energy field not found");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    EnergyFieldResponse* field = it->second.get();
+    bool updated = false;
+
+    // Validate and update provided fields
+    if (request_json.isMember("energy_level_mev")) {
+        if (!request_json["energy_level_mev"].isNumeric()) {
+            sendErrorResponse(res, 400, "energy_level_mev must be numeric");
+            metrics_->incrementErrors();
+            return;
+        }
+        double level = request_json["energy_level_mev"].asDouble();
+        if (level < 0 || level > 1000000) {
+            sendErrorResponse(res, 400, "Energy level must be between 0 and 1,000,000 MeV");
+            metrics_->incrementErrors();
+            return;
+        }
+        field->energy_level_mev = level;
+        updated = true;
+    }
+
+    if (request_json.isMember("stability_factor")) {
+        if (!request_json["stability_factor"].isNumeric()) {
+            sendErrorResponse(res, 400, "stability_factor must be numeric");
+            metrics_->incrementErrors();
+            return;
+        }
+        field->stability_factor = request_json["stability_factor"].asDouble();
+        updated = true;
+    }
+
+    if (request_json.isMember("dissipation_rate")) {
+        if (!request_json["dissipation_rate"].isNumeric()) {
+            sendErrorResponse(res, 400, "dissipation_rate must be numeric");
+            metrics_->incrementErrors();
+            return;
+        }
+        field->dissipation_rate = request_json["dissipation_rate"].asDouble();
+        updated = true;
+    }
+
+    if (request_json.isMember("base_three_mev_per_sec")) {
+        if (!request_json["base_three_mev_per_sec"].isNumeric()) {
+            sendErrorResponse(res, 400, "base_three_mev_per_sec must be numeric");
+            metrics_->incrementErrors();
+            return;
+        }
+        field->base_three_mev_per_sec = request_json["base_three_mev_per_sec"].asDouble();
+        updated = true;
+    }
+
+    if (request_json.isMember("entropy_factor")) {
+        if (!request_json["entropy_factor"].isNumeric()) {
+            sendErrorResponse(res, 400, "entropy_factor must be numeric");
+            metrics_->incrementErrors();
+            return;
+        }
+        field->entropy_factor = request_json["entropy_factor"].asDouble();
+        updated = true;
+    }
+
+    if (request_json.isMember("status")) {
+        if (!request_json["status"].isString()) {
+            sendErrorResponse(res, 400, "status must be string");
+            metrics_->incrementErrors();
+            return;
+        }
+        field->status = request_json["status"].asString();
+        updated = true;
+    }
+
+    if (!updated) {
+        sendErrorResponse(res, 400, "No valid fields provided for update");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    field->last_updated = std::chrono::system_clock::now();
+
+    Json::Value response = field->toJson();
+    sendJSONResponse(res, 200, response);
+    metrics_->incrementSuccessful();
+
+    std::cout << "Energy field updated successfully: " << field_id << std::endl;
 }
 
 void HTTPTernaryFissionServer::handleEnergyFieldDelete(const httplib::Request& req, httplib::Response& res) {
