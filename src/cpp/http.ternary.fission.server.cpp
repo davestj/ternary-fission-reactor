@@ -953,10 +953,19 @@ void HTTPTernaryFissionServer::setupWebSocketEndpoints() {
 void HTTPTernaryFissionServer::broadcastWebSocketUpdates() {
     while (websocket_broadcasting_) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
-        
+
         // We broadcast system status to all connected clients
         SystemStatusResponse status = generateSystemStatus();
-        // Broadcast implementation will be added with WebSocket support
+
+        Json::StreamWriterBuilder builder;
+        builder["indentation"] = "";
+        std::string message = Json::writeString(builder, status.toJson());
+
+        std::lock_guard<std::mutex> lock(websocket_mutex_);
+        for (auto& [id, connection] : websocket_connections_) {
+            std::lock_guard<std::mutex> qlock(connection->queue_mutex);
+            connection->message_queue.push(message);
+        }
     }
 }
 
