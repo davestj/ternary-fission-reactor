@@ -1,3 +1,19 @@
+#ifndef CONFIG_TERNARY_FISSION_SERVER_H
+#define CONFIG_TERNARY_FISSION_SERVER_H
+
+#include "physics.utilities.h"
+
+namespace TernaryFission {
+
+class Configuration {
+public:
+    Configuration();
+    const EnergyFieldConfig& getPhysicsConfig() const;
+
+private:
+    EnergyFieldConfig physics_config_;
+};
+
 /*
  * File: include/config.ternary.fission.server.h
  * Author: bthlops (David StJ)
@@ -366,6 +382,7 @@ namespace ConfigurationUtils {
     bool isValidEnergyField(double energy);
     bool areConservationLawTolerancesRealistic(double tolerance);
 }
+
 
 } // namespace TernaryFission
 

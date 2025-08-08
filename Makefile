@@ -21,6 +21,43 @@ VERSION := 1.1.13
 BUILD_DATE := $(shell date -u +"%Y-%m-%d_%H:%M:%S_UTC")
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
+
+# We detect the operating system and architecture
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+
+# We set platform-specific variables
+ifeq ($(UNAME_S),Darwin)
+    PLATFORM := macos
+    # We detect Homebrew installation paths for macOS
+    ifeq ($(UNAME_M),arm64)
+	HOMEBREW_PREFIX := /opt/homebrew
+    else
+	HOMEBREW_PREFIX := /usr/local
+    endif
+    # We check if OpenSSL is installed via Homebrew
+    OPENSSL_PREFIX := $(HOMEBREW_PREFIX)/opt/openssl@3
+    ifneq ($(wildcard $(OPENSSL_PREFIX)/include/openssl/evp.h),)
+	OPENSSL_FOUND := true
+	OPENSSL_INCLUDE := -I$(OPENSSL_PREFIX)/include
+	OPENSSL_LIB := -L$(OPENSSL_PREFIX)/lib
+    else
+	# We fall back to system OpenSSL if Homebrew version not found
+	OPENSSL_FOUND := false
+	OPENSSL_INCLUDE :=
+	OPENSSL_LIB :=
+    endif
+else ifeq ($(UNAME_S),Linux)
+    PLATFORM := linux
+    OPENSSL_FOUND := true
+    OPENSSL_INCLUDE :=
+    OPENSSL_LIB :=
+else
+    PLATFORM := windows
+    OPENSSL_FOUND := false
+    OPENSSL_INCLUDE :=
+    OPENSSL_LIB :=
+
 # =============================================================================
 # PLATFORM DETECTION
 # =============================================================================
@@ -37,6 +74,7 @@ endif
 
 ifeq ($(UNAME), Linux)
 	PLATFORM := linux
+
 endif
 
 # =============================================================================
@@ -64,12 +102,28 @@ ifeq ($(PLATFORM), macos)
         CXXFLAGS += -DCPPHTTPLIB_OPENSSL_SUPPORT
 endif
 
+
+# Build configurations
+DEBUG_FLAGS := $(COMMON_FLAGS) -g -O0 -DDEBUG -fsanitize=address -fsanitize=undefined
+RELEASE_FLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG -flto
+PROFILE_FLAGS := $(COMMON_FLAGS) -O2 -pg -DPROFILE
+
+# We adjust march flag for macOS ARM
+ifeq ($(PLATFORM),macos)
+    ifeq ($(UNAME_M),arm64)
+	RELEASE_FLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG -flto -mcpu=apple-m1
+    else
+	RELEASE_FLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG -march=native -flto
+    endif
+else
+    RELEASE_FLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG -march=native -flto
 ifeq ($(PLATFORM), linux)
         CXXFLAGS += $(shell pkg-config --cflags openssl jsoncpp)
         LDFLAGS += $(shell pkg-config --libs openssl jsoncpp)
         CXXFLAGS += -DLINUX
         CFLAGS += -DLINUX
         CXXFLAGS += -DCPPHTTPLIB_OPENSSL_SUPPORT
+
 endif
 
 CXXFLAGS += -DVERSION=\"$(VERSION)\" -DBUILD_DATE=\"$(BUILD_DATE)\" -DGIT_COMMIT=\"$(GIT_COMMIT)\"
@@ -86,8 +140,18 @@ BIN_DIR := bin
 DIST_DIR := dist
 TEST_DIR := tests
 
+# Source files
+CPP_SOURCES := $(wildcard $(SRC_DIR)/cpp/*.cpp)
+CPP_HEADERS := $(wildcard $(INCLUDE_DIR)/*.h)
+GO_SOURCES := $(wildcard $(SRC_DIR)/go/*.go)
+
+# Object files (exclude main files to avoid multiple main definitions)
+CPP_OBJS := $(BUILD_DIR)/$(BUILD_TYPE)/physics.utilities.o \
+	    $(BUILD_DIR)/$(BUILD_TYPE)/ternary.fission.simulation.engine.o
+
 BUILD_TYPE ?= release
 BUILD_SUBDIR := $(BUILD_DIR)/$(BUILD_TYPE)
+
 
 CPP_SOURCES := $(wildcard $(CPP_SRC_DIR)/*.cpp)
 CPP_OBJECTS := $(CPP_SOURCES:$(CPP_SRC_DIR)/%.cpp=$(BUILD_SUBDIR)/%.o)
@@ -121,8 +185,27 @@ info:
 	@echo "Flags: $(CXXFLAGS)"
 	@echo "================"
 
+
+# Link main executable
+$(CPP_MAIN): $(CPP_OBJS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp | $(BIN_DIR)
+ifeq ($(BUILD_TYPE),debug)
+	@echo "Building C++ simulation engine (DEBUG)..."
+	$(CXX) $(DEBUG_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) \
+	$(SRC_DIR)/cpp/daemon.ternary.fission.server.cpp $(SRC_DIR)/cpp/config.ternary.fission.server.cpp -o $@ $(LDFLAGS)
+else ifeq ($(BUILD_TYPE),profile)
+	@echo "Building C++ simulation engine (PROFILE)..."
+	$(CXX) $(PROFILE_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) \
+	$(SRC_DIR)/cpp/daemon.ternary.fission.server.cpp $(SRC_DIR)/cpp/config.ternary.fission.server.cpp -o $@ $(LDFLAGS)
+else
+	@echo "Building C++ simulation engine (RELEASE)..."
+	$(CXX) $(RELEASE_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) \
+	$(SRC_DIR)/cpp/daemon.ternary.fission.server.cpp $(SRC_DIR)/cpp/config.ternary.fission.server.cpp -o $@ $(LDFLAGS)
+endif
+	@echo "C++ build complete: $@"
+
 $(BUILD_SUBDIR):
 	@mkdir -p $@
+
 
 $(BIN_DIR):
 	@mkdir -p $@

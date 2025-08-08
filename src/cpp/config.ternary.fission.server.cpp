@@ -1,3 +1,14 @@
+
+#include "config.ternary.fission.server.h"
+
+namespace TernaryFission {
+
+Configuration::Configuration() : physics_config_() {}
+
+const EnergyFieldConfig& Configuration::getPhysicsConfig() const {
+    return physics_config_;
+}
+
 /*
  * File: src/cpp/config.ternary.fission.server.cpp
  * Author: bthlops (David StJ)

@@ -31,9 +31,11 @@
 #include "ternary.fission.simulation.engine.h"
 #include "physics.utilities.h"
 #include "physics.constants.definitions.h"
+
 #include "config.ternary.fission.server.h"
 #include "daemon.ternary.fission.server.h"
 #include "http.ternary.fission.server.h"
+
 
 #include <iostream>
 #include <iomanip>
@@ -204,6 +206,25 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+
+    // Retrieve physics configuration from the daemon server
+    DaemonTernaryFissionServer daemon_server;
+    auto daemon_config = daemon_server.getConfiguration();
+    initializePhysicsUtilities(&daemon_config->getPhysicsConfig());
+
+    // Print simulation parameters
+    std::cout << "Simulation Parameters:" << std::endl;
+    std::cout << "  Parent mass (AMU):      " << parent_mass << std::endl;
+    std::cout << "  Excitation energy (MeV):" << excitation_energy << std::endl;
+    std::cout << "  Events:                 " << num_events << std::endl;
+    std::cout << "  Threads:                " << threads << std::endl;
+    if (run_continuous) {
+        std::cout << "  Continuous mode:        ENABLED" << std::endl;
+        std::cout << "  Duration (s):           " << duration_seconds << std::endl;
+        std::cout << "  Events per second:      " << events_per_second << std::endl;
+    } else {
+        std::cout << "  Continuous mode:        DISABLED" << std::endl;
+
     // Handle config file creation
     if (create_config) {
         if (createDefaultConfigFile(config_file)) {
@@ -214,6 +235,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         return 0;
+
     }
 
     // Run in daemon mode if requested
