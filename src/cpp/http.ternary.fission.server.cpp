@@ -273,7 +273,7 @@ bool HTTPTernaryFissionServer::initialize() {
     }
     
     // We load network configuration from config manager
-    auto network_config = config_manager_->getNetworkConfiguration();
+    auto network_config = config_manager_->getNetworkConfig();
     bind_ip_ = network_config.bind_ip;
     bind_port_ = network_config.bind_port;
     ssl_enabled_ = network_config.enable_ssl;
@@ -454,7 +454,7 @@ void HTTPTernaryFissionServer::setupMiddleware() {
  * This method adds appropriate CORS headers to all responses
  */
 void HTTPTernaryFissionServer::corsMiddleware(const httplib::Request& req, httplib::Response& res) {
-    auto network_config = config_manager_->getNetworkConfiguration();
+    auto network_config = config_manager_->getNetworkConfig();
     
     if (network_config.enable_cors) {
         // We set CORS headers based on configuration
@@ -805,7 +805,7 @@ std::string HTTPTernaryFissionServer::generateFieldID() {
  * This method loads and validates SSL certificates from configuration paths
  */
 bool HTTPTernaryFissionServer::loadSSLCertificates() {
-    auto ssl_config = config_manager_->getSSLConfiguration();
+    auto ssl_config = config_manager_->getSSLConfig();
     
     if (ssl_config.certificate_file.empty() || ssl_config.private_key_file.empty()) {
         std::cerr << "SSL certificate or private key path not configured" << std::endl;
@@ -875,7 +875,7 @@ bool HTTPTernaryFissionServer::validateSSLCertificate(const std::string& cert_pa
  * This method configures HTTPS server with loaded certificates
  */
 void HTTPTernaryFissionServer::setupSSLServer() {
-    auto ssl_config = config_manager_->getSSLConfiguration();
+    auto ssl_config = config_manager_->getSSLConfig();
     
     https_server_ = std::make_unique<httplib::SSLServer>(
         ssl_config.certificate_file.c_str(),
@@ -956,7 +956,7 @@ void HTTPTernaryFissionServer::collectMetrics() {
         updateFieldStatistics();
         
         // We log current metrics periodically
-        if (config_manager_->getLoggingConfiguration().verbose_output) {
+        if (config_manager_->getLoggingConfig().verbose_output) {
             std::cout << "Metrics: " << metrics_->total_requests.load() 
                       << " requests, " << metrics_->active_connections.load() 
                       << " connections" << std::endl;
