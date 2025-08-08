@@ -126,8 +126,16 @@ go-build:
 # =============================================================================
 # TEST AND QA
 # =============================================================================
-test:
-	@echo "✓ Test target stubbed. (Unit tests TBD)"
+TEST_BIN := tests/system_metrics_test
+
+test: $(TEST_BIN)
+	./$(TEST_BIN)
+
+$(TEST_BIN): tests/system_metrics_test.cpp src/cpp/system.metrics.cpp | tests
+	$(CXX) $(CXXFLAGS) $(INCLUDES) $^ -o $@ $(LDFLAGS) $(LIBS)
+
+tests:
+	@mkdir -p tests
 
 qa:
 	@which cppcheck && cppcheck $(CPP_SRC_DIR) --enable=all --suppress=missingIncludeSystem || echo "cppcheck not installed"

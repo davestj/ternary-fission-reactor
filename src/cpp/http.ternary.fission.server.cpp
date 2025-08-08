@@ -29,6 +29,7 @@
 
 #include "http.ternary.fission.server.h"
 #include "physics.utilities.h"
+#include "system.metrics.h"
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -707,9 +708,10 @@ SystemStatusResponse HTTPTernaryFissionServer::generateSystemStatus() const {
     }
     
     // We calculate system resource usage
-    status.cpu_usage_percent = 0.0;  // TODO: Implement actual CPU monitoring
-    status.memory_usage_percent = 0.0;  // TODO: Implement actual memory monitoring
-    status.peak_memory_usage_bytes = 0;  // TODO: Implement memory tracking
+    status.cpu_usage_percent = getCPUUsagePercent();
+    MemoryUsage mem = getMemoryUsage();
+    status.memory_usage_percent = mem.percent;
+    status.peak_memory_usage_bytes = mem.peak_bytes;
     
     return status;
 }
