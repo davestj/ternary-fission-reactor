@@ -168,8 +168,8 @@ private:
     std::atomic<int64_t> field_id_counter_;     // Field ID generation counter
     
     // We handle WebSocket connections
-    std::map<std::string, std::unique_ptr<WebSocketConnection>> websocket_connections_;
-    std::mutex websocket_mutex_;                // WebSocket synchronization
+      std::map<std::string, std::unique_ptr<WebSocketConnection>> websocket_connections_;
+      mutable std::mutex websocket_mutex_;                // WebSocket synchronization
     std::thread websocket_broadcast_thread_;    // WebSocket broadcast worker
     std::atomic<bool> websocket_broadcasting_;  // WebSocket broadcast control
     

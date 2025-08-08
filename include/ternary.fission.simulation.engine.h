@@ -85,6 +85,7 @@ public:
      * @return: Complete ternary fission event structure
      */
     TernaryFissionEvent simulateTernaryFissionEvent(double parent_mass, double excitation_energy);
+    Json::Value simulateTernaryFissionEventAPI(const Json::Value& request);
 
     /**
      * Create an energy field with specified energy
@@ -94,6 +95,7 @@ public:
      * @return: Energy field structure
      */
     EnergyField createEnergyField(double energy_mev);
+    Json::Value createEnergyFieldAPI(const Json::Value& request);
 
     /**
      * Dissipate energy from an existing field
@@ -111,21 +113,12 @@ public:
      * @param events_per_second: Target simulation rate
      */
     void startContinuousSimulation(double events_per_second);
+    void stopContinuousSimulation();
 
-    /**
-     * Start continuous simulation via API request
-     * We process JSON parameters and return status
-     *
-     * @param request: JSON parameters including events_per_second
-     * @return: JSON status response
-     */
     Json::Value startContinuousSimulationAPI(const Json::Value& request);
-
-    /**
-     * Stop continuous simulation
-     * We halt background generation and wait for completion
-     */
-    void stopSimulation();
+    Json::Value stopContinuousSimulationAPI();
+    Json::Value getSystemStatusAPI() const;
+    Json::Value getEnergyFieldsAPI() const;
 
     /**
      * Check if simulation is currently running
@@ -184,7 +177,7 @@ private:
     // We define private member variables for internal state
     int num_worker_threads;
     std::vector<std::thread> worker_threads;
-    std::thread continuous_generator_thread;
+    std::thread continuous_thread;
 
     // We use atomic counters for thread-safe statistics
     std::atomic<std::uint64_t> total_events_simulated;
@@ -201,10 +194,33 @@ private:
     mutable std::mutex state_mutex;
     SimulationState simulation_state;
 
+    // We provide thread-safe API request handling
+    mutable std::mutex api_mutex_;
+    std::uint64_t api_request_counter_;
+    bool json_serialization_enabled_;
+
     // We implement thread-safe event queue processing
     std::mutex queue_mutex;
     std::condition_variable queue_cv;
     std::queue<TernaryFissionEvent> event_queue;
+
+    /**
+     * Serialize fission event to JSON
+     * We convert physics structures to API responses
+     *
+     * @param event: Event to serialize
+     * @return: JSON representation
+     */
+    Json::Value serializeFissionEventToJSON(const TernaryFissionEvent& event) const;
+
+    /**
+     * Serialize energy field to JSON
+     * We convert field data for API responses
+     *
+     * @param field: Energy field to serialize
+     * @return: JSON representation
+     */
+    Json::Value serializeEnergyFieldToJSON(const EnergyField& field) const;
 
     /**
      * Generate a ternary fission event (private method)
