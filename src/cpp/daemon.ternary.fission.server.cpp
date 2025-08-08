@@ -52,6 +52,7 @@
 #include <mach/mach_host.h>
 #include <mach/host_info.h>
 #include <sys/sysctl.h>
+#include <libproc.h>
 #elif defined(__linux__)
 #include <sys/sysinfo.h>
 #endif
@@ -896,6 +897,22 @@ uint64_t DaemonTernaryFissionServer::getOpenFileDescriptorCount() {
         if (entry->d_name[0] != '.') count++;
     }
     closedir(fd_dir);
+    return count;
+#elif defined(__APPLE__)
+    pid_t pid = getpid();
+    int buf_size = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nullptr, 0);
+    if (buf_size <= 0) return 0;
+
+    struct proc_fdinfo* fdinfo = static_cast<struct proc_fdinfo*>(malloc(buf_size));
+    if (!fdinfo) return 0;
+
+    int bytes = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, fdinfo, buf_size);
+    uint64_t count = 0;
+    if (bytes > 0) {
+        count = static_cast<uint64_t>(bytes) / PROC_PIDLISTFD_SIZE;
+    }
+
+    free(fdinfo);
     return count;
 #else
     return 0;  // Platform-specific implementation needed

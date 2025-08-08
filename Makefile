@@ -26,10 +26,10 @@ ARCH := $(shell uname -m)
 PLATFORM := unknown
 
 ifeq ($(UNAME), Darwin)
-	PLATFORM := macos
-	HOMEBREW_PREFIX := $(shell brew --prefix)
-	OPENSSL_PREFIX := $(HOMEBREW_PREFIX)/opt/openssl@3
-	JSONCPP_PREFIX := $(HOMEBREW_PREFIX)/opt/jsoncpp
+        PLATFORM := macos
+        HOMEBREW_PREFIX := $(shell brew --prefix)
+        OPENSSL_PREFIX := $(HOMEBREW_PREFIX)/opt/openssl@3
+        JSONCPP_PREFIX := $(HOMEBREW_PREFIX)/opt/jsoncpp
 endif
 
 ifeq ($(UNAME), Linux)
@@ -52,11 +52,11 @@ LDFLAGS :=
 LIBS := -lm -lpthread
 
 ifeq ($(PLATFORM), macos)
-	CXXFLAGS += -DMACOS
-	CFLAGS += -DMACOS
-	CXXFLAGS += -I$(OPENSSL_PREFIX)/include -I$(JSONCPP_PREFIX)/include
-	LDFLAGS += -L$(OPENSSL_PREFIX)/lib -L$(JSONCPP_PREFIX)/lib
-	LIBS += -lssl -lcrypto -ljsoncpp -framework Security -framework CoreFoundation
+        CXXFLAGS += -DMACOS
+        CFLAGS += -DMACOS
+        CXXFLAGS += -I$(OPENSSL_PREFIX)/include -I$(JSONCPP_PREFIX)/include
+        LDFLAGS += -L$(OPENSSL_PREFIX)/lib -L$(JSONCPP_PREFIX)/lib
+        LIBS += -lssl -lcrypto -ljsoncpp -framework Security -framework CoreFoundation -lproc
 endif
 
 ifeq ($(PLATFORM), linux)
@@ -127,7 +127,10 @@ go-build:
 # TEST AND QA
 # =============================================================================
 test:
-	@echo "✓ Test target stubbed. (Unit tests TBD)"
+	@mkdir -p $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) tests/test_fd_count.cpp $(LDFLAGS) $(LIBS) -o $(BUILD_DIR)/test_fd_count
+	$(BUILD_DIR)/test_fd_count
+	@echo "✓ Tests passed"
 
 qa:
 	@which cppcheck && cppcheck $(CPP_SRC_DIR) --enable=all --suppress=missingIncludeSystem || echo "cppcheck not installed"
