@@ -37,6 +37,7 @@
 #include <thread>       // For threading
 #include <condition_variable> // For thread coordination
 #include <queue>        // For event queue
+#include <json/json.h>  // For JSON API responses
 
 #include "physics.constants.definitions.h"
 #include "physics.utilities.h"
@@ -110,6 +111,15 @@ public:
      * @param events_per_second: Target simulation rate
      */
     void startContinuousSimulation(double events_per_second);
+
+    /**
+     * Start continuous simulation via API request
+     * We process JSON parameters and return status
+     *
+     * @param request: JSON parameters including events_per_second
+     * @return: JSON status response
+     */
+    Json::Value startContinuousSimulationAPI(const Json::Value& request);
 
     /**
      * Stop continuous simulation
