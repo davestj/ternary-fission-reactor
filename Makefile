@@ -57,6 +57,7 @@ else
     OPENSSL_FOUND := false
     OPENSSL_INCLUDE :=
     OPENSSL_LIB :=
+endif
 
 # =============================================================================
 # PLATFORM DETECTION
@@ -117,12 +118,14 @@ ifeq ($(PLATFORM),macos)
     endif
 else
     RELEASE_FLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG -march=native -flto
-ifeq ($(PLATFORM), linux)
+    ifeq ($(PLATFORM), linux)
         CXXFLAGS += $(shell pkg-config --cflags openssl jsoncpp)
         LDFLAGS += $(shell pkg-config --libs openssl jsoncpp)
         CXXFLAGS += -DLINUX
         CFLAGS += -DLINUX
         CXXFLAGS += -DCPPHTTPLIB_OPENSSL_SUPPORT
+
+    endif
 
 endif
 
