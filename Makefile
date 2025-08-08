@@ -36,21 +36,21 @@ ifeq ($(UNAME_S),Darwin)
     PLATFORM := macos
     # We detect Homebrew installation paths for macOS
     ifeq ($(UNAME_M),arm64)
-        HOMEBREW_PREFIX := /opt/homebrew
+	HOMEBREW_PREFIX := /opt/homebrew
     else
-        HOMEBREW_PREFIX := /usr/local
+	HOMEBREW_PREFIX := /usr/local
     endif
     # We check if OpenSSL is installed via Homebrew
     OPENSSL_PREFIX := $(HOMEBREW_PREFIX)/opt/openssl@3
     ifneq ($(wildcard $(OPENSSL_PREFIX)/include/openssl/evp.h),)
-        OPENSSL_FOUND := true
-        OPENSSL_INCLUDE := -I$(OPENSSL_PREFIX)/include
-        OPENSSL_LIB := -L$(OPENSSL_PREFIX)/lib
+	OPENSSL_FOUND := true
+	OPENSSL_INCLUDE := -I$(OPENSSL_PREFIX)/include
+	OPENSSL_LIB := -L$(OPENSSL_PREFIX)/lib
     else
-        # We fall back to system OpenSSL if Homebrew version not found
-        OPENSSL_FOUND := false
-        OPENSSL_INCLUDE :=
-        OPENSSL_LIB :=
+	# We fall back to system OpenSSL if Homebrew version not found
+	OPENSSL_FOUND := false
+	OPENSSL_INCLUDE :=
+	OPENSSL_LIB :=
     endif
 else ifeq ($(UNAME_S),Linux)
     PLATFORM := linux
@@ -97,9 +97,9 @@ PROFILE_FLAGS := $(COMMON_FLAGS) -O2 -pg -DPROFILE
 # We adjust march flag for macOS ARM
 ifeq ($(PLATFORM),macos)
     ifeq ($(UNAME_M),arm64)
-        RELEASE_FLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG -flto -mcpu=apple-m1
+	RELEASE_FLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG -flto -mcpu=apple-m1
     else
-        RELEASE_FLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG -march=native -flto
+	RELEASE_FLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG -march=native -flto
     endif
 else
     RELEASE_FLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG -march=native -flto
@@ -124,7 +124,7 @@ GO_SOURCES := $(wildcard $(SRC_DIR)/go/*.go)
 
 # Object files (exclude main files to avoid multiple main definitions)
 CPP_OBJS := $(BUILD_DIR)/$(BUILD_TYPE)/physics.utilities.o \
-            $(BUILD_DIR)/$(BUILD_TYPE)/ternary.fission.simulation.engine.o
+	    $(BUILD_DIR)/$(BUILD_TYPE)/ternary.fission.simulation.engine.o
 
 # Executables
 CPP_MAIN := $(BIN_DIR)/ternary-fission
@@ -276,13 +276,16 @@ endif
 $(CPP_MAIN): $(CPP_OBJS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp | $(BIN_DIR)
 ifeq ($(BUILD_TYPE),debug)
 	@echo "Building C++ simulation engine (DEBUG)..."
-	$(CXX) $(DEBUG_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) -o $@ $(LDFLAGS)
+	$(CXX) $(DEBUG_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) \
+	$(SRC_DIR)/cpp/daemon.ternary.fission.server.cpp $(SRC_DIR)/cpp/config.ternary.fission.server.cpp -o $@ $(LDFLAGS)
 else ifeq ($(BUILD_TYPE),profile)
 	@echo "Building C++ simulation engine (PROFILE)..."
-	$(CXX) $(PROFILE_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) -o $@ $(LDFLAGS)
+	$(CXX) $(PROFILE_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) \
+	$(SRC_DIR)/cpp/daemon.ternary.fission.server.cpp $(SRC_DIR)/cpp/config.ternary.fission.server.cpp -o $@ $(LDFLAGS)
 else
 	@echo "Building C++ simulation engine (RELEASE)..."
-	$(CXX) $(RELEASE_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) -o $@ $(LDFLAGS)
+	$(CXX) $(RELEASE_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) \
+	$(SRC_DIR)/cpp/daemon.ternary.fission.server.cpp $(SRC_DIR)/cpp/config.ternary.fission.server.cpp -o $@ $(LDFLAGS)
 endif
 	@echo "C++ build complete: $@"
 

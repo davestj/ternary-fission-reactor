@@ -22,6 +22,7 @@
 #include "ternary.fission.simulation.engine.h"
 #include "physics.utilities.h"
 #include "physics.constants.definitions.h"
+#include "daemon.ternary.fission.server.h"
 
 #include <iostream>
 #include <iomanip>
@@ -137,6 +138,11 @@ int main(int argc, char* argv[]) {
     if (stat(log_dir.c_str(), &st) == -1) {
         mkdir(log_dir.c_str(), 0700);
     }
+
+    // Retrieve physics configuration from the daemon server
+    DaemonTernaryFissionServer daemon_server;
+    auto daemon_config = daemon_server.getConfiguration();
+    initializePhysicsUtilities(&daemon_config->getPhysicsConfig());
 
     // Print simulation parameters
     std::cout << "Simulation Parameters:" << std::endl;
