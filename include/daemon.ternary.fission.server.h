@@ -122,6 +122,7 @@ private:
     std::atomic<DaemonStatus> daemon_status_;   // Current daemon operational status
     std::atomic<bool> shutdown_requested_;      // Graceful shutdown request flag
     std::atomic<bool> restart_requested_;       // Daemon restart request flag
+    std::atomic<bool> debug_mode_;              // Verbose diagnostics flag
     std::chrono::system_clock::time_point start_time_; // Daemon startup timestamp
     
     // We manage signal handling system
