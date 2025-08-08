@@ -1,22 +1,3 @@
-#ifndef DAEMON_TERNARY_FISSION_SERVER_H
-#define DAEMON_TERNARY_FISSION_SERVER_H
-
-#include <memory>
-
-#include "config.ternary.fission.server.h"
-
-namespace TernaryFission {
-
-class DaemonTernaryFissionServer {
-public:
-    DaemonTernaryFissionServer();
-    explicit DaemonTernaryFissionServer(std::shared_ptr<Configuration> config);
-
-    std::shared_ptr<Configuration> getConfiguration() const;
-
-private:
-    std::shared_ptr<Configuration> configuration_;
-
 /*
  * File: include/daemon.ternary.fission.server.h
  * Author: bthlops (David StJ)
@@ -41,7 +22,7 @@ private:
  * - Log management supports rotation and multiple output destinations
  * - Security features include user/group switching and umask configuration
  * - Platform compatibility supports macOS, Ubuntu 24, and Debian 12
- * - Next: Integration with HTTP server and configuration classes for complete service
+ * - Next: Integration with HTTP server and configuration manager classes for complete service
  */
 
 #ifndef DAEMON_TERNARY_FISSION_SERVER_H
@@ -133,7 +114,7 @@ struct ProcessInfo {
  */
 class DaemonTernaryFissionServer {
 private:
-    std::unique_ptr<ConfigurationManager> config_manager_;     // Configuration management
+    std::unique_ptr<ConfigurationManager> config_manager_;     // ConfigurationManager management
     std::shared_ptr<DaemonStatistics> statistics_;            // Daemon performance statistics
     std::unique_ptr<ProcessInfo> process_info_;               // Process identification info
     
@@ -223,7 +204,13 @@ public:
      * The destructor ensures all resources are properly released
      */
     virtual ~DaemonTernaryFissionServer();
-    
+
+    /**
+     * We get the configuration manager
+     * This method returns the configuration manager instance
+     */
+    ConfigurationManager* getConfiguration() const;
+
     /**
      * We initialize the daemon with configuration validation
      * This method prepares all daemon components for background operation
