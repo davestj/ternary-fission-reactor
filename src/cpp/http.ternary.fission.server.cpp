@@ -275,7 +275,7 @@ bool HTTPTernaryFissionServer::initialize() {
     }
     
     // We load network configuration from config manager
-    auto network_config = config_manager_->getNetworkConfiguration();
+    auto network_config = config_manager_->getNetworkConfig();
     bind_ip_ = network_config.bind_ip;
     bind_port_ = network_config.bind_port;
     ssl_enabled_ = network_config.enable_ssl;
@@ -425,7 +425,7 @@ void HTTPTernaryFissionServer::setSimulationEngine(std::shared_ptr<TernaryFissio
  * We get current server performance metrics
  * This method returns complete server statistics and performance data
  */
-HTTPServerMetrics HTTPTernaryFissionServer::getMetrics() const {
+const HTTPServerMetrics& HTTPTernaryFissionServer::getMetrics() const {
     return *metrics_;
 }
 
@@ -473,7 +473,7 @@ void HTTPTernaryFissionServer::setupMiddleware() {
  * This method adds appropriate CORS headers to all responses
  */
 void HTTPTernaryFissionServer::corsMiddleware(const httplib::Request& req, httplib::Response& res) {
-    auto network_config = config_manager_->getNetworkConfiguration();
+    auto network_config = config_manager_->getNetworkConfig();
     
     if (network_config.enable_cors) {
         // We set CORS headers based on configuration
@@ -502,11 +502,12 @@ void HTTPTernaryFissionServer::corsMiddleware(const httplib::Request& req, httpl
  */
 void HTTPTernaryFissionServer::loggingMiddleware(const httplib::Request& req, httplib::Response& res) {
     auto start_time = std::chrono::steady_clock::now();
-    
+
     // We log request details
-    std::cout << "[" << std::put_time(std::localtime(&std::time(nullptr)), "%Y-%m-%d %H:%M:%S") << "] "
+    std::time_t now = std::time(nullptr);
+    std::cout << "[" << std::put_time(std::localtime(&now), "%Y-%m-%d %H:%M:%S") << "] "
               << req.method << " " << req.path << " from " << req.remote_addr << std::endl;
-    
+
     // We calculate response time when response is sent
     auto end_time = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -828,7 +829,7 @@ std::string HTTPTernaryFissionServer::generateFieldID() {
  * This method loads and validates SSL certificates from configuration paths
  */
 bool HTTPTernaryFissionServer::loadSSLCertificates() {
-    auto ssl_config = config_manager_->getSSLConfiguration();
+    auto ssl_config = config_manager_->getSSLConfig();
     
     if (ssl_config.certificate_file.empty() || ssl_config.private_key_file.empty()) {
         std::cerr << "SSL certificate or private key path not configured" << std::endl;
@@ -899,8 +900,8 @@ bool HTTPTernaryFissionServer::validateSSLCertificate(const std::string& cert_pa
  * This method configures HTTPS server with loaded certificates
  */
 void HTTPTernaryFissionServer::setupSSLServer() {
-    auto ssl_config = config_manager_->getSSLConfiguration();
-
+    auto ssl_config = config_manager_->getSSLConfig();
+    
     https_server_ = std::make_unique<httplib::SSLServer>(
         ssl_config.certificate_file.c_str(),
         ssl_config.private_key_file.c_str()
@@ -981,7 +982,7 @@ void HTTPTernaryFissionServer::collectMetrics() {
         updateFieldStatistics();
         
         // We log current metrics periodically
-        if (config_manager_->getLoggingConfiguration().verbose_output) {
+        if (config_manager_->getLoggingConfig().verbose_output) {
             std::cout << "Metrics: " << metrics_->total_requests.load() 
                       << " requests, " << metrics_->active_connections.load() 
                       << " connections" << std::endl;

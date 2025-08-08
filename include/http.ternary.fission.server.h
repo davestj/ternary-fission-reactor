@@ -225,7 +225,7 @@ private:
     
     // We collect and manage server metrics
     void collectMetrics();                     // Metrics collection worker
-    SystemStatusResponse generateSystemStatus(); // Generate status response
+    SystemStatusResponse generateSystemStatus() const; // Generate status response
     void updateFieldStatistics();             // Update field statistics
     
     // We provide physics engine integration
@@ -286,7 +286,7 @@ public:
      * We get current server performance metrics
      * This method returns complete server statistics and performance data
      */
-    HTTPServerMetrics getMetrics() const;
+    const HTTPServerMetrics& getMetrics() const;
     
     /**
      * We get current system status information
