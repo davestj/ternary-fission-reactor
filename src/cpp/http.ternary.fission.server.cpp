@@ -410,7 +410,7 @@ void HTTPTernaryFissionServer::setSimulationEngine(std::shared_ptr<TernaryFissio
  * We get current server performance metrics
  * This method returns complete server statistics and performance data
  */
-HTTPServerMetrics HTTPTernaryFissionServer::getMetrics() const {
+const HTTPServerMetrics& HTTPTernaryFissionServer::getMetrics() const {
     return *metrics_;
 }
 
