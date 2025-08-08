@@ -183,6 +183,12 @@ public:
     bool loadConfiguration();
     
     /**
+     * We reload configuration unconditionally from the current file
+     * This allows manual refresh of configuration without checking modification time
+     */
+    bool reloadConfiguration();
+
+    /**
      * We reload configuration if file has been modified
      * This enables runtime configuration updates without daemon restart
      */
