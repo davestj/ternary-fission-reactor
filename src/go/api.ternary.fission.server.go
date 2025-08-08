@@ -205,18 +205,20 @@ type EnergyFieldRequest struct {
 
 // We define the API response structure for energy field status
 type EnergyFieldResponse struct {
-	FieldID              string    `json:"field_id"`
-	InitialEnergyMeV     float64   `json:"initial_energy_mev"`
-	CurrentEnergyMeV     float64   `json:"current_energy_mev"`
-	EnergyDissipated     float64   `json:"energy_dissipated"`
-	MemoryAllocated      uint64    `json:"memory_allocated_bytes"`
-	CPUCyclesConsumed    uint64    `json:"cpu_cycles_consumed"`
-	EncryptionRounds     int       `json:"encryption_rounds_completed"`
-	DissipationRate      float64   `json:"dissipation_rate_mev_per_sec"`
-	EntropyFactor        float64   `json:"entropy_factor"`
-	CreatedAt            time.Time `json:"created_at"`
-	LastUpdated          time.Time `json:"last_updated"`
-	Status               string    `json:"status"`
+        FieldID              string    `json:"field_id"`
+        InitialEnergyMeV     float64   `json:"initial_energy_mev"`
+        CurrentEnergyMeV     float64   `json:"current_energy_mev"`
+        EnergyDissipated     float64   `json:"energy_dissipated"`
+        MemoryAllocated      uint64    `json:"memory_allocated_bytes"`
+        CPUCyclesConsumed    uint64    `json:"cpu_cycles_consumed"`
+        EncryptionRounds     int       `json:"encryption_rounds_completed"`
+        DissipationRate      float64   `json:"dissipation_rate_mev_per_sec"`
+        EntropyFactor        float64   `json:"entropy_factor"`
+       Active              bool      `json:"active"`
+       TotalEnergyMeV      float64   `json:"total_energy_mev"`
+        CreatedAt            time.Time `json:"created_at"`
+        LastUpdated          time.Time `json:"last_updated"`
+        Status               string    `json:"status"`
 }
 
 // We define system status response
@@ -1388,20 +1390,22 @@ func (s *TernaryFissionAPIServer) createEnergyField(w http.ResponseWriter, r *ht
 	fieldID := fmt.Sprintf("field_%d_%d", atomic.AddInt64(&s.fieldIDCounter, 1), time.Now().Unix())
 
 	// We create energy field response structure
-	field := &EnergyFieldResponse{
-		FieldID:              fieldID,
-		InitialEnergyMeV:     request.InitialEnergyMeV,
-		CurrentEnergyMeV:     request.InitialEnergyMeV,
-		EnergyDissipated:     0.0,
-		MemoryAllocated:      uint64(request.InitialEnergyMeV * 1e6), // 1 MeV = 1MB simulation
-		CPUCyclesConsumed:    uint64(request.InitialEnergyMeV * 1e9), // 1 MeV = 1B cycles simulation
-		EncryptionRounds:     0,
-		DissipationRate:      0.0,
-		EntropyFactor:        1.0,
-		CreatedAt:            time.Now(),
-		LastUpdated:          time.Now(),
-		Status:               "active",
-	}
+        field := &EnergyFieldResponse{
+                FieldID:              fieldID,
+                InitialEnergyMeV:     request.InitialEnergyMeV,
+                CurrentEnergyMeV:     request.InitialEnergyMeV,
+                EnergyDissipated:     0.0,
+                MemoryAllocated:      uint64(request.InitialEnergyMeV * 1e6), // 1 MeV = 1MB simulation
+                CPUCyclesConsumed:    uint64(request.InitialEnergyMeV * 1e9), // 1 MeV = 1B cycles simulation
+                EncryptionRounds:     0,
+                DissipationRate:      0.0,
+                EntropyFactor:        1.0,
+               Active:               true,
+               TotalEnergyMeV:       request.InitialEnergyMeV,
+                CreatedAt:            time.Now(),
+                LastUpdated:          time.Now(),
+                Status:               "active",
+        }
 
 	// We store the field in our tracking system
 	s.fieldsMutex.Lock()
