@@ -237,8 +237,8 @@ HTTPTernaryFissionServer::HTTPTernaryFissionServer(std::unique_ptr<Configuration
     , start_time_(std::chrono::system_clock::now())
     , field_id_counter_(1)
     , websocket_broadcasting_(false)
-    , metrics_collecting_(false)
-    , metrics_(std::make_unique<HTTPServerMetrics>()) {
+    , metrics_(std::make_unique<HTTPServerMetrics>())
+    , metrics_collecting_(false) {
     
     // We initialize SSL library for certificate handling
     SSL_library_init();
