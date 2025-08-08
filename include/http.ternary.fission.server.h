@@ -282,7 +282,7 @@ public:
      * We get current server performance metrics
      * This method returns complete server statistics and performance data
      */
-    HTTPServerMetrics getMetrics() const;
+    const HTTPServerMetrics& getMetrics() const;
     
     /**
      * We get current system status information
