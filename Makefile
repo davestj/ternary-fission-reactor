@@ -12,6 +12,7 @@
 # - 2025-08-07: Resolved merge conflict in test section - merged FD count testing with system metrics testing
 # - 2025-08-07: Enhanced test system to support multiple test suites with proper dependency management
 # - 2025-08-07: Added comprehensive test harness with platform-specific test execution
+# - 2025-08-09: Automated C++ object discovery and linking via pattern rules
 
 # =============================================================================
 # PROJECT METADATA
@@ -151,13 +152,11 @@ CPP_SOURCES := $(wildcard $(SRC_DIR)/cpp/*.cpp)
 CPP_HEADERS := $(wildcard $(INCLUDE_DIR)/*.h)
 GO_SOURCES := $(wildcard $(SRC_DIR)/go/*.go)
 
-# Object files (exclude main files to avoid multiple main definitions)
-CPP_OBJS := $(BUILD_SUBDIR)/physics.utilities.o \
-            $(BUILD_SUBDIR)/ternary.fission.simulation.engine.o
+# Object files (exclude main file to avoid multiple definitions)
+CPP_OBJS := $(patsubst %.cpp,$(BUILD_SUBDIR)/%.o,\
+             $(filter-out main.ternary.fission.application.cpp,\
+             $(notdir $(wildcard $(SRC_DIR)/cpp/*.cpp))))
 
-
-CPP_SOURCES := $(wildcard $(CPP_SRC_DIR)/*.cpp)
-CPP_OBJECTS := $(CPP_SOURCES:$(CPP_SRC_DIR)/%.cpp=$(BUILD_SUBDIR)/%.o)
 CPP_MAIN := $(BIN_DIR)/$(PROJECT_NAME)
 GO_BINARY := $(BIN_DIR)/ternary-api
 
@@ -193,16 +192,13 @@ info:
 $(CPP_MAIN): $(CPP_OBJS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp | $(BIN_DIR)
 ifeq ($(BUILD_TYPE),debug)
 	@echo "Building C++ simulation engine (DEBUG)..."
-	$(CXX) $(DEBUG_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) \
-	$(SRC_DIR)/cpp/daemon.ternary.fission.server.cpp $(SRC_DIR)/cpp/config.ternary.fission.server.cpp -o $@ $(LDFLAGS)
+	$(CXX) $(DEBUG_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) -o $@ $(LDFLAGS)
 else ifeq ($(BUILD_TYPE),profile)
 	@echo "Building C++ simulation engine (PROFILE)..."
-	$(CXX) $(PROFILE_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) \
-	$(SRC_DIR)/cpp/daemon.ternary.fission.server.cpp $(SRC_DIR)/cpp/config.ternary.fission.server.cpp -o $@ $(LDFLAGS)
+	$(CXX) $(PROFILE_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) -o $@ $(LDFLAGS)
 else
 	@echo "Building C++ simulation engine (RELEASE)..."
-	$(CXX) $(RELEASE_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) \
-	$(SRC_DIR)/cpp/daemon.ternary.fission.server.cpp $(SRC_DIR)/cpp/config.ternary.fission.server.cpp -o $@ $(LDFLAGS)
+	$(CXX) $(RELEASE_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) -o $@ $(LDFLAGS)
 endif
 	@echo "C++ build complete: $@"
 
