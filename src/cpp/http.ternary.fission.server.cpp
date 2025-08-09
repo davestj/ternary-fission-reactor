@@ -37,6 +37,7 @@
 #include <random>
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -1317,6 +1318,8 @@ void HTTPTernaryFissionServer::handleConservationLaws(const httplib::Request& re
 
     try {
         TernaryFissionEvent event;
+        event.event_id = body.get("event_id", 0).asUInt64();
+        event.energy_field_id = body.get("energy_field_id", 0).asUInt64();
         event.q_value = body.get("q_value", 0.0).asDouble();
 
         auto parseFragment = [](const Json::Value& jf, FissionFragment& frag) {
@@ -1341,10 +1344,33 @@ void HTTPTernaryFissionServer::handleConservationLaws(const httplib::Request& re
         parseFragment(body["light_fragment"], event.light_fragment);
         parseFragment(body["alpha_particle"], event.alpha_particle);
 
-        bool ok = verifyConservationLaws(event, 1e-3, 1e-6);
+        event.total_kinetic_energy = event.heavy_fragment.kinetic_energy +
+                                    event.light_fragment.kinetic_energy +
+                                    event.alpha_particle.kinetic_energy;
+        event.binding_energy_released = event.q_value - event.total_kinetic_energy;
+
+        // Calculate conservation errors
+        double total_px = event.heavy_fragment.momentum.x + event.light_fragment.momentum.x +
+                          event.alpha_particle.momentum.x;
+        double total_py = event.heavy_fragment.momentum.y + event.light_fragment.momentum.y +
+                          event.alpha_particle.momentum.y;
+        double total_pz = event.heavy_fragment.momentum.z + event.light_fragment.momentum.z +
+                          event.alpha_particle.momentum.z;
+
+        event.momentum_conservation_error =
+            std::sqrt(total_px * total_px + total_py * total_py + total_pz * total_pz);
+        event.momentum_conserved = event.momentum_conservation_error < 1e-6;
+
+        event.energy_conservation_error =
+            std::abs(event.q_value - event.total_kinetic_energy);
+        event.energy_conserved = event.energy_conservation_error < 1e-3;
+
+        bool ok = event.energy_conserved && event.momentum_conserved;
 
         Json::Value response;
         response["conserved"] = ok;
+        response["energy_conservation_error"] = event.energy_conservation_error;
+        response["momentum_conservation_error"] = event.momentum_conservation_error;
         sendJSONResponse(res, 200, response);
     } catch (const std::exception& e) {
         sendErrorResponse(res, 400, std::string("Invalid event data: ") + e.what());
