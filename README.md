@@ -85,6 +85,9 @@ brew install jsoncpp openssl@3 cpp-httplib
 # Build all components
 make all
 
+# Build only C++ components
+make cpp-build
+
 # The cpp-httplib header is vendored under `third_party/cpp-httplib/httplib.h` if package managers are unavailable.
 
 # Run API server
