@@ -1386,6 +1386,10 @@ void HTTPTernaryFissionServer::handleEnergyGeneration(const httplib::Request& re
         jf["energy_mev"] = field.energy_mev;
         jf["memory_bytes"] = static_cast<Json::UInt64>(field.memory_bytes);
         jf["cpu_cycles"] = static_cast<Json::UInt64>(field.cpu_cycles);
+        jf["entropy_factor"] = field.entropy_factor;
+        jf["dissipation_rate"] = field.dissipation_rate;
+        jf["stability_factor"] = field.stability_factor;
+        jf["interaction_strength"] = field.interaction_strength;
 
         auto time_since_epoch = field.creation_time.time_since_epoch();
         auto timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count();
