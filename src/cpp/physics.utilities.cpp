@@ -130,7 +130,8 @@ std::string energyFieldToJSON(const EnergyField& field) {
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
 
     json_operations_counter_.fetch_add(1, std::memory_order_relaxed);
-    json_serialization_time_total_.fetch_add(duration.count() / 1e6, std::memory_order_relaxed);
+    double current = json_serialization_time_total_.load(std::memory_order_relaxed);
+    json_serialization_time_total_.store(current + duration.count() / 1e6, std::memory_order_relaxed);
 
     return json_string;
 }
@@ -212,7 +213,8 @@ std::string fissionEventToJSON(const TernaryFissionEvent& event) {
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
 
     json_operations_counter_.fetch_add(1, std::memory_order_relaxed);
-    json_serialization_time_total_.fetch_add(duration.count() / 1e6, std::memory_order_relaxed);
+    double current = json_serialization_time_total_.load(std::memory_order_relaxed);
+    json_serialization_time_total_.store(current + duration.count() / 1e6, std::memory_order_relaxed);
 
     return json_string;
 }
