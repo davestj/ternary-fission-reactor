@@ -108,7 +108,8 @@ std::string energyFieldToJSON(const EnergyField& field) {
     json_field["memory_allocated"] = (field.memory_ptr != nullptr && field.memory_bytes > 0);
 
     if (field.memory_ptr && field.memory_bytes > 0) {
-        json_field["memory_address"] = reinterpret_cast<uintptr_t>(field.memory_ptr);
+        json_field["memory_address"] = static_cast<Json::UInt64>(
+            reinterpret_cast<uintptr_t>(field.memory_ptr));
 
         // Calculate memory entropy for monitoring
         double memory_entropy = calculateEntropy(field.memory_bytes, field.cpu_cycles);
@@ -155,8 +156,8 @@ std::string fissionEventToJSON(const TernaryFissionEvent& event) {
     auto serializeFragment = [](const FissionFragment& fragment) -> Json::Value {
         Json::Value json_fragment;
         json_fragment["mass"] = fragment.mass;
-        json_fragment["atomic_number"] = fragment.atomic_number;
-        json_fragment["mass_number"] = fragment.mass_number;
+        json_fragment["atomic_number"] = static_cast<Json::Int64>(fragment.atomic_number);
+        json_fragment["mass_number"] = static_cast<Json::Int64>(fragment.mass_number);
         json_fragment["kinetic_energy"] = fragment.kinetic_energy;
         json_fragment["binding_energy"] = fragment.binding_energy;
         json_fragment["excitation_energy"] = fragment.excitation_energy;
@@ -227,7 +228,7 @@ std::string formatHTTPResponse(const std::string& status, const std::string& mes
     Json::Value response;
     response["status"] = status;
     response["message"] = message;
-    response["http_status"] = http_status_code;
+    response["http_status"] = static_cast<Json::Int64>(http_status_code);
 
     if (!data.isNull() && !data.empty()) {
         response["data"] = data;

@@ -200,7 +200,7 @@ Json::Value TernaryFissionSimulationEngine::simulateTernaryFissionEventAPI(const
         } catch (const std::exception& e) {
             Json::Value error;
             error["error"] = "Event simulation failed: " + std::string(e.what());
-            error["event_index"] = i;
+            error["event_index"] = static_cast<Json::Int64>(i);
             events_array.append(error);
         }
     }
@@ -210,7 +210,7 @@ Json::Value TernaryFissionSimulationEngine::simulateTernaryFissionEventAPI(const
 
     // Build response
     response["status"] = "success";
-    response["num_events"] = num_events;
+    response["num_events"] = static_cast<Json::Int64>(num_events);
     response["events"] = events_array;
     response["computation_time_microseconds"] = static_cast<Json::Int64>(duration.count());
     response["request_id"] = static_cast<Json::Int64>(api_request_counter_);
@@ -242,8 +242,9 @@ Json::Value TernaryFissionSimulationEngine::getSystemStatusAPI() const {
         status["total_computation_time_seconds"] = total_computation_time_seconds;
     }
 
-    status["worker_threads"] = num_worker_threads;
-    status["active_energy_fields"] = static_cast<int>(simulation_state.active_energy_fields.size());
+    status["worker_threads"] = static_cast<Json::Int64>(num_worker_threads);
+    status["active_energy_fields"] = static_cast<Json::Int64>(
+        simulation_state.active_energy_fields.size());
     status["energy_conservation_enabled"] = simulation_state.energy_conservation_enabled;
     status["momentum_conservation_enabled"] = simulation_state.momentum_conservation_enabled;
     status["target_events_per_second"] = target_events_per_second.load();
@@ -291,7 +292,8 @@ Json::Value TernaryFissionSimulationEngine::getEnergyFieldsAPI() const {
     }
 
     response["energy_fields"] = fields_array;
-    response["total_fields"] = static_cast<int>(simulation_state.active_energy_fields.size());
+    response["total_fields"] = static_cast<Json::Int64>(
+        simulation_state.active_energy_fields.size());
     response["status"] = "success";
 
     return response;
@@ -388,8 +390,10 @@ Json::Value TernaryFissionSimulationEngine::serializeFissionEventToJSON(const Te
     // Fragment data
     Json::Value heavy_fragment;
     heavy_fragment["mass"] = event.heavy_fragment.mass;
-    heavy_fragment["atomic_number"] = event.heavy_fragment.atomic_number;
-    heavy_fragment["mass_number"] = event.heavy_fragment.mass_number;
+    heavy_fragment["atomic_number"] = static_cast<Json::Int64>(
+        event.heavy_fragment.atomic_number);
+    heavy_fragment["mass_number"] = static_cast<Json::Int64>(
+        event.heavy_fragment.mass_number);
     heavy_fragment["kinetic_energy"] = event.heavy_fragment.kinetic_energy;
     heavy_fragment["momentum_x"] = event.heavy_fragment.momentum.x;
     heavy_fragment["momentum_y"] = event.heavy_fragment.momentum.y;
@@ -398,8 +402,10 @@ Json::Value TernaryFissionSimulationEngine::serializeFissionEventToJSON(const Te
 
     Json::Value light_fragment;
     light_fragment["mass"] = event.light_fragment.mass;
-    light_fragment["atomic_number"] = event.light_fragment.atomic_number;
-    light_fragment["mass_number"] = event.light_fragment.mass_number;
+    light_fragment["atomic_number"] = static_cast<Json::Int64>(
+        event.light_fragment.atomic_number);
+    light_fragment["mass_number"] = static_cast<Json::Int64>(
+        event.light_fragment.mass_number);
     light_fragment["kinetic_energy"] = event.light_fragment.kinetic_energy;
     light_fragment["momentum_x"] = event.light_fragment.momentum.x;
     light_fragment["momentum_y"] = event.light_fragment.momentum.y;
@@ -408,8 +414,10 @@ Json::Value TernaryFissionSimulationEngine::serializeFissionEventToJSON(const Te
 
     Json::Value alpha_particle;
     alpha_particle["mass"] = event.alpha_particle.mass;
-    alpha_particle["atomic_number"] = event.alpha_particle.atomic_number;
-    alpha_particle["mass_number"] = event.alpha_particle.mass_number;
+    alpha_particle["atomic_number"] = static_cast<Json::Int64>(
+        event.alpha_particle.atomic_number);
+    alpha_particle["mass_number"] = static_cast<Json::Int64>(
+        event.alpha_particle.mass_number);
     alpha_particle["kinetic_energy"] = event.alpha_particle.kinetic_energy;
     alpha_particle["momentum_x"] = event.alpha_particle.momentum.x;
     alpha_particle["momentum_y"] = event.alpha_particle.momentum.y;
@@ -463,7 +471,8 @@ Json::Value TernaryFissionSimulationEngine::serializeEnergyFieldToJSON(const Ene
     // Memory mapping info
     if (field.memory_ptr && field.memory_bytes > 0) {
         json_field["memory_allocated"] = true;
-        json_field["memory_address"] = reinterpret_cast<uintptr_t>(field.memory_ptr);
+        json_field["memory_address"] = static_cast<Json::UInt64>(
+            reinterpret_cast<uintptr_t>(field.memory_ptr));
     } else {
         json_field["memory_allocated"] = false;
     }

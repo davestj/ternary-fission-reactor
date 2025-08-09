@@ -144,7 +144,7 @@ Json::Value SystemStatusResponse::toJson() const {
     json["uptime_seconds"] = static_cast<Json::Int64>(uptime_seconds);
     json["total_fission_events"] = static_cast<Json::UInt64>(total_fission_events);
     json["total_energy_simulated_mev"] = total_energy_simulated_mev;
-    json["active_energy_fields"] = active_energy_fields;
+    json["active_energy_fields"] = static_cast<Json::Int64>(active_energy_fields);
     json["peak_memory_usage_bytes"] = static_cast<Json::UInt64>(peak_memory_usage_bytes);
     json["average_calculation_time_microseconds"] = average_calc_time_microseconds;
     json["total_calculations"] = static_cast<Json::UInt64>(total_calculations);
@@ -624,7 +624,7 @@ void HTTPTernaryFissionServer::handleHealthCheck(const httplib::Request& /*req*/
     Json::Value health;
     health["status"] = "healthy";
     health["uptime_seconds"] = static_cast<Json::Int64>(uptime.count());
-    health["active_energy_fields"] = static_cast<int>(energy_fields_.size());
+    health["active_energy_fields"] = static_cast<Json::Int64>(energy_fields_.size());
     health["simulation_running"] = simulation_engine_ != nullptr;
     health["version"] = "1.1.13";
     health["author"] = "bthlops (David StJ)";
@@ -667,7 +667,7 @@ void HTTPTernaryFissionServer::handleEnergyFieldsList(const httplib::Request& /*
     
     Json::Value response;
     response["energy_fields"] = fields_array;
-    response["total_fields"] = static_cast<int>(energy_fields_.size());
+    response["total_fields"] = static_cast<Json::Int64>(energy_fields_.size());
     
     sendJSONResponse(res, 200, response);
     metrics_->incrementSuccessful();
@@ -774,7 +774,7 @@ void HTTPTernaryFissionServer::sendJSONResponse(httplib::Response& res, int stat
 void HTTPTernaryFissionServer::sendErrorResponse(httplib::Response& res, int status_code, const std::string& message) {
     Json::Value error;
     error["error"] = message;
-    error["status_code"] = status_code;
+    error["status_code"] = static_cast<Json::Int64>(status_code);
     
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
@@ -1409,9 +1409,9 @@ Json::Value HTTPTernaryFissionServer::computeFieldStatistics() const {
     int inactive_fields = total_fields - active_fields;
     double average_energy = total_fields > 0 ? total_energy / total_fields : 0.0;
 
-    stats["total_fields"] = total_fields;
-    stats["active_fields"] = active_fields;
-    stats["inactive_fields"] = inactive_fields;
+    stats["total_fields"] = static_cast<Json::Int64>(total_fields);
+    stats["active_fields"] = static_cast<Json::Int64>(active_fields);
+    stats["inactive_fields"] = static_cast<Json::Int64>(inactive_fields);
     stats["total_energy_mev"] = total_energy;
     stats["average_energy_mev"] = average_energy;
     stats["peak_energy_mev"] = peak_energy;

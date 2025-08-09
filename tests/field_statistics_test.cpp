@@ -26,9 +26,9 @@ Json::Value computeFieldStatistics(const std::map<std::string, std::unique_ptr<E
     double average_energy = total_fields > 0 ? total_energy / total_fields : 0.0;
 
     Json::Value stats;
-    stats["total_fields"] = total_fields;
-    stats["active_fields"] = active_fields;
-    stats["inactive_fields"] = inactive_fields;
+    stats["total_fields"] = static_cast<Json::Int64>(total_fields);
+    stats["active_fields"] = static_cast<Json::Int64>(active_fields);
+    stats["inactive_fields"] = static_cast<Json::Int64>(inactive_fields);
     stats["total_energy_mev"] = total_energy;
     stats["average_energy_mev"] = average_energy;
     stats["peak_energy_mev"] = peak_energy;
