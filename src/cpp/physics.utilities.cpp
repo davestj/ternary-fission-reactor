@@ -64,12 +64,12 @@
 
 namespace TernaryFission {
 
-// Forward declarations for internal utility functions
-static void encryptMemoryPattern(void* memory_ptr, size_t memory_size, uint64_t field_id);
-static void applyEntropyToMemory(void* memory_ptr, size_t memory_size, double entropy_factor);
+    // Forward declarations for internal utility functions
+    void encryptMemoryPattern(void* memory_ptr, size_t memory_size, uint64_t field_id);
+    void applyEntropyToMemory(void* memory_ptr, size_t memory_size, double entropy_factor);
 
-// Global thread-local storage for random number generators
-thread_local std::mt19937_64 tl_rng(std::random_device{}());
+    // Global thread-local storage for random number generators
+    thread_local std::mt19937_64 tl_rng(std::random_device{}());
 
 // Global configuration
 EnergyFieldConfig g_energy_field_config;
