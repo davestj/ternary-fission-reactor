@@ -611,6 +611,10 @@ TernaryFissionEvent TernaryFissionSimulationEngine::generateFissionEvent(double 
     TernaryFissionEvent event;
     event.timestamp = std::chrono::high_resolution_clock::now();
 
+    static std::atomic<std::uint64_t> event_id_counter{1};
+    event.event_id = event_id_counter.fetch_add(1, std::memory_order_relaxed);
+    event.energy_field_id = generateFieldId();
+
     // Parent nucleus properties (U-235 defaults)
     const int parent_atomic_number = 92;
     const int parent_mass_number = static_cast<int>(parent_mass);
@@ -661,6 +665,7 @@ TernaryFissionEvent TernaryFissionSimulationEngine::generateFissionEvent(double 
     event.total_kinetic_energy = event.alpha_particle.kinetic_energy +
                                 event.light_fragment.kinetic_energy +
                                 event.heavy_fragment.kinetic_energy;
+    event.binding_energy_released = event.q_value - event.total_kinetic_energy;
 
     // Generate random momentum directions (conservation will be applied)
     generateRandomMomentum(event.alpha_particle);
@@ -669,6 +674,20 @@ TernaryFissionEvent TernaryFissionSimulationEngine::generateFissionEvent(double 
 
     // Apply conservation laws
     applyConservationLaws(event);
+
+    // Calculate conservation errors
+    event.energy_conservation_error = std::abs(event.q_value - event.total_kinetic_energy);
+    event.energy_conserved = event.energy_conservation_error < 1e-3;
+
+    double total_px = event.heavy_fragment.momentum.x + event.light_fragment.momentum.x +
+                      event.alpha_particle.momentum.x;
+    double total_py = event.heavy_fragment.momentum.y + event.light_fragment.momentum.y +
+                      event.alpha_particle.momentum.y;
+    double total_pz = event.heavy_fragment.momentum.z + event.light_fragment.momentum.z +
+                      event.alpha_particle.momentum.z;
+    event.momentum_conservation_error =
+        std::sqrt(total_px * total_px + total_py * total_py + total_pz * total_pz);
+    event.momentum_conserved = event.momentum_conservation_error < 1e-6;
 
     return event;
 }
