@@ -395,9 +395,19 @@ Json::Value TernaryFissionSimulationEngine::serializeFissionEventToJSON(const Te
     heavy_fragment["mass_number"] = static_cast<Json::Int64>(
         event.heavy_fragment.mass_number);
     heavy_fragment["kinetic_energy"] = event.heavy_fragment.kinetic_energy;
-    heavy_fragment["momentum_x"] = event.heavy_fragment.momentum.x;
-    heavy_fragment["momentum_y"] = event.heavy_fragment.momentum.y;
-    heavy_fragment["momentum_z"] = event.heavy_fragment.momentum.z;
+    heavy_fragment["binding_energy"] = event.heavy_fragment.binding_energy;
+    heavy_fragment["excitation_energy"] = event.heavy_fragment.excitation_energy;
+    heavy_fragment["half_life"] = event.heavy_fragment.half_life;
+    Json::Value heavy_momentum;
+    heavy_momentum["x"] = event.heavy_fragment.momentum.x;
+    heavy_momentum["y"] = event.heavy_fragment.momentum.y;
+    heavy_momentum["z"] = event.heavy_fragment.momentum.z;
+    heavy_fragment["momentum"] = heavy_momentum;
+    Json::Value heavy_position;
+    heavy_position["x"] = event.heavy_fragment.position.x;
+    heavy_position["y"] = event.heavy_fragment.position.y;
+    heavy_position["z"] = event.heavy_fragment.position.z;
+    heavy_fragment["position"] = heavy_position;
     json_event["heavy_fragment"] = heavy_fragment;
 
     Json::Value light_fragment;
@@ -407,9 +417,19 @@ Json::Value TernaryFissionSimulationEngine::serializeFissionEventToJSON(const Te
     light_fragment["mass_number"] = static_cast<Json::Int64>(
         event.light_fragment.mass_number);
     light_fragment["kinetic_energy"] = event.light_fragment.kinetic_energy;
-    light_fragment["momentum_x"] = event.light_fragment.momentum.x;
-    light_fragment["momentum_y"] = event.light_fragment.momentum.y;
-    light_fragment["momentum_z"] = event.light_fragment.momentum.z;
+    light_fragment["binding_energy"] = event.light_fragment.binding_energy;
+    light_fragment["excitation_energy"] = event.light_fragment.excitation_energy;
+    light_fragment["half_life"] = event.light_fragment.half_life;
+    Json::Value light_momentum;
+    light_momentum["x"] = event.light_fragment.momentum.x;
+    light_momentum["y"] = event.light_fragment.momentum.y;
+    light_momentum["z"] = event.light_fragment.momentum.z;
+    light_fragment["momentum"] = light_momentum;
+    Json::Value light_position;
+    light_position["x"] = event.light_fragment.position.x;
+    light_position["y"] = event.light_fragment.position.y;
+    light_position["z"] = event.light_fragment.position.z;
+    light_fragment["position"] = light_position;
     json_event["light_fragment"] = light_fragment;
 
     Json::Value alpha_particle;
@@ -419,9 +439,19 @@ Json::Value TernaryFissionSimulationEngine::serializeFissionEventToJSON(const Te
     alpha_particle["mass_number"] = static_cast<Json::Int64>(
         event.alpha_particle.mass_number);
     alpha_particle["kinetic_energy"] = event.alpha_particle.kinetic_energy;
-    alpha_particle["momentum_x"] = event.alpha_particle.momentum.x;
-    alpha_particle["momentum_y"] = event.alpha_particle.momentum.y;
-    alpha_particle["momentum_z"] = event.alpha_particle.momentum.z;
+    alpha_particle["binding_energy"] = event.alpha_particle.binding_energy;
+    alpha_particle["excitation_energy"] = event.alpha_particle.excitation_energy;
+    alpha_particle["half_life"] = event.alpha_particle.half_life;
+    Json::Value alpha_momentum;
+    alpha_momentum["x"] = event.alpha_particle.momentum.x;
+    alpha_momentum["y"] = event.alpha_particle.momentum.y;
+    alpha_momentum["z"] = event.alpha_particle.momentum.z;
+    alpha_particle["momentum"] = alpha_momentum;
+    Json::Value alpha_position;
+    alpha_position["x"] = event.alpha_particle.position.x;
+    alpha_position["y"] = event.alpha_particle.position.y;
+    alpha_position["z"] = event.alpha_particle.position.z;
+    alpha_particle["position"] = alpha_position;
     json_event["alpha_particle"] = alpha_particle;
 
     // Energy data
