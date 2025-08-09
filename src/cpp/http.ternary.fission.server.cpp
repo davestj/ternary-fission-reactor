@@ -36,6 +36,7 @@
 #include <iomanip>
 #include <random>
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -1359,12 +1360,19 @@ void HTTPTernaryFissionServer::handleEnergyGeneration(const httplib::Request& re
         }
 
         Json::Value jf;
-        jf["initial_energy_mev"] = field.initial_energy_level;
-        jf["current_energy_mev"] = field.current_energy_level;
-        jf["memory_allocated_bytes"] = static_cast<Json::UInt64>(field.memory_allocated);
-        jf["cpu_cycles_consumed"] = static_cast<Json::UInt64>(field.cpu_cycles_consumed);
+        jf["field_id"] = static_cast<Json::UInt64>(field.field_id);
+        jf["energy_mev"] = field.energy_mev;
+        jf["memory_bytes"] = static_cast<Json::UInt64>(field.memory_bytes);
+        jf["cpu_cycles"] = static_cast<Json::UInt64>(field.cpu_cycles);
         jf["entropy_factor"] = field.entropy_factor;
-        jf["energy_dissipated"] = field.energy_dissipated;
+        jf["dissipation_rate"] = field.dissipation_rate;
+        jf["stability_factor"] = field.stability_factor;
+        jf["interaction_strength"] = field.interaction_strength;
+
+        auto time_since_epoch = field.creation_time.time_since_epoch();
+        auto timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count();
+        jf["creation_time_ms"] = static_cast<Json::Int64>(timestamp_ms);
+        jf["memory_allocated"] = (field.memory_ptr != nullptr && field.memory_bytes > 0);
 
         sendJSONResponse(res, 200, jf);
     } catch (const std::exception& e) {

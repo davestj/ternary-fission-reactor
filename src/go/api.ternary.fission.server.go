@@ -56,32 +56,32 @@ import (
 // We define the configuration structure to hold all settings
 type Config struct {
 	// API Server settings
-	APIPort                   int    `config:"api_port"`
-	APIHost                   string `config:"api_host"`
-	APITimeout                int    `config:"api_timeout"`
-	MaxRequestSize            int64  `config:"max_request_size"`
-	MaxConcurrentConnections  int    `config:"max_concurrent_connections"`
+	APIPort                  int    `config:"api_port"`
+	APIHost                  string `config:"api_host"`
+	APITimeout               int    `config:"api_timeout"`
+	MaxRequestSize           int64  `config:"max_request_size"`
+	MaxConcurrentConnections int    `config:"max_concurrent_connections"`
 
 	// WebSocket settings
-	WebSocketEnabled          bool   `config:"websocket_enabled"`
-	WebSocketBufferSize       int    `config:"websocket_buffer_size"`
-	WebSocketTimeout          int    `config:"websocket_timeout"`
-	WebSocketPingInterval     int    `config:"websocket_ping_interval"`
+	WebSocketEnabled      bool `config:"websocket_enabled"`
+	WebSocketBufferSize   int  `config:"websocket_buffer_size"`
+	WebSocketTimeout      int  `config:"websocket_timeout"`
+	WebSocketPingInterval int  `config:"websocket_ping_interval"`
 
 	// Physics simulation settings
-	ParentMass                float64 `config:"parent_mass"`
-	ExcitationEnergy          float64 `config:"excitation_energy"`
-	EventsPerSecond           float64 `config:"events_per_second"`
-	MaxEnergyField            float64 `config:"max_energy_field"`
+	ParentMass       float64 `config:"parent_mass"`
+	ExcitationEnergy float64 `config:"excitation_energy"`
+	EventsPerSecond  float64 `config:"events_per_second"`
+	MaxEnergyField   float64 `config:"max_energy_field"`
 
 	// Logging settings
-	LogLevel                  string `config:"log_level"`
-	VerboseOutput             bool   `config:"verbose_output"`
+	LogLevel      string `config:"log_level"`
+	VerboseOutput bool   `config:"verbose_output"`
 
 	// Feature flags
-	PrometheusEnabled         bool   `config:"prometheus_enabled"`
-	CORSEnabled               bool   `config:"cors_enabled"`
-	RateLimitingEnabled       bool   `config:"rate_limiting_enabled"`
+	PrometheusEnabled   bool `config:"prometheus_enabled"`
+	CORSEnabled         bool `config:"cors_enabled"`
+	RateLimitingEnabled bool `config:"rate_limiting_enabled"`
 }
 
 // We provide default configuration values with port 8238
@@ -205,34 +205,33 @@ type EnergyFieldRequest struct {
 
 // We define the API response structure for energy field status
 type EnergyFieldResponse struct {
-        FieldID              string    `json:"field_id"`
-        InitialEnergyMeV     float64   `json:"initial_energy_mev"`
-        CurrentEnergyMeV     float64   `json:"current_energy_mev"`
-        EnergyDissipated     float64   `json:"energy_dissipated"`
-        MemoryAllocated      uint64    `json:"memory_allocated_bytes"`
-        CPUCyclesConsumed    uint64    `json:"cpu_cycles_consumed"`
-        EncryptionRounds     int       `json:"encryption_rounds_completed"`
-        DissipationRate      float64   `json:"dissipation_rate_mev_per_sec"`
-        EntropyFactor        float64   `json:"entropy_factor"`
-       Active              bool      `json:"active"`
-       TotalEnergyMeV      float64   `json:"total_energy_mev"`
-        CreatedAt            time.Time `json:"created_at"`
-        LastUpdated          time.Time `json:"last_updated"`
-        Status               string    `json:"status"`
+	FieldID             string    `json:"field_id"`
+	EnergyMeV           float64   `json:"energy_mev"`
+	MemoryBytes         uint64    `json:"memory_bytes"`
+	CPUCycles           uint64    `json:"cpu_cycles"`
+	EntropyFactor       float64   `json:"entropy_factor"`
+	DissipationRate     float64   `json:"dissipation_rate"`
+	StabilityFactor     float64   `json:"stability_factor"`
+	InteractionStrength float64   `json:"interaction_strength"`
+	Active              bool      `json:"active"`
+	TotalEnergyMeV      float64   `json:"total_energy_mev"`
+	CreatedAt           time.Time `json:"created_at"`
+	LastUpdated         time.Time `json:"last_updated"`
+	Status              string    `json:"status"`
 }
 
 // We define system status response
 type SystemStatusResponse struct {
-	UptimeSeconds         int64   `json:"uptime_seconds"`
-	TotalFissionEvents    uint64  `json:"total_fission_events"`
-	TotalEnergySimulated  float64 `json:"total_energy_simulated_mev"`
-	ActiveEnergyFields    int     `json:"active_energy_fields"`
-	PeakMemoryUsage       uint64  `json:"peak_memory_usage_bytes"`
-	AverageCalcTime       float64 `json:"average_calculation_time_microseconds"`
-	TotalCalculations     uint64  `json:"total_calculations"`
-	SimulationRunning     bool    `json:"simulation_running"`
-	CPUUsagePercent       float64 `json:"cpu_usage_percent"`
-	MemoryUsagePercent    float64 `json:"memory_usage_percent"`
+	UptimeSeconds        int64   `json:"uptime_seconds"`
+	TotalFissionEvents   uint64  `json:"total_fission_events"`
+	TotalEnergySimulated float64 `json:"total_energy_simulated_mev"`
+	ActiveEnergyFields   int     `json:"active_energy_fields"`
+	PeakMemoryUsage      uint64  `json:"peak_memory_usage_bytes"`
+	AverageCalcTime      float64 `json:"average_calculation_time_microseconds"`
+	TotalCalculations    uint64  `json:"total_calculations"`
+	SimulationRunning    bool    `json:"simulation_running"`
+	CPUUsagePercent      float64 `json:"cpu_usage_percent"`
+	MemoryUsagePercent   float64 `json:"memory_usage_percent"`
 }
 
 // =============================================================================
@@ -256,9 +255,9 @@ type TernaryFissionAPIServer struct {
 	energyTotalGauge  prometheus.Gauge
 
 	// Application state
-	energyFields      map[string]*EnergyFieldResponse
-	fieldsMutex       sync.RWMutex
-	fieldIDCounter    int64
+	energyFields   map[string]*EnergyFieldResponse
+	fieldsMutex    sync.RWMutex
+	fieldIDCounter int64
 
 	// System control
 	simulationRunning atomic.Bool
@@ -327,8 +326,8 @@ func (s *TernaryFissionAPIServer) initializeMetrics() {
 
 	s.responseTime = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name: "ternary_fission_api_response_time_seconds",
-			Help: "Response time of API requests",
+			Name:    "ternary_fission_api_response_time_seconds",
+			Help:    "Response time of API requests",
 			Buckets: prometheus.DefBuckets,
 		},
 		[]string{"endpoint", "method"},
@@ -1390,22 +1389,21 @@ func (s *TernaryFissionAPIServer) createEnergyField(w http.ResponseWriter, r *ht
 	fieldID := fmt.Sprintf("field_%d_%d", atomic.AddInt64(&s.fieldIDCounter, 1), time.Now().Unix())
 
 	// We create energy field response structure
-        field := &EnergyFieldResponse{
-                FieldID:              fieldID,
-                InitialEnergyMeV:     request.InitialEnergyMeV,
-                CurrentEnergyMeV:     request.InitialEnergyMeV,
-                EnergyDissipated:     0.0,
-                MemoryAllocated:      uint64(request.InitialEnergyMeV * 1e6), // 1 MeV = 1MB simulation
-                CPUCyclesConsumed:    uint64(request.InitialEnergyMeV * 1e9), // 1 MeV = 1B cycles simulation
-                EncryptionRounds:     0,
-                DissipationRate:      0.0,
-                EntropyFactor:        1.0,
-               Active:               true,
-               TotalEnergyMeV:       request.InitialEnergyMeV,
-                CreatedAt:            time.Now(),
-                LastUpdated:          time.Now(),
-                Status:               "active",
-        }
+	field := &EnergyFieldResponse{
+		FieldID:             fieldID,
+		EnergyMeV:           request.InitialEnergyMeV,
+		MemoryBytes:         uint64(request.InitialEnergyMeV * 1e6), // 1 MeV = 1MB simulation
+		CPUCycles:           uint64(request.InitialEnergyMeV * 1e9), // 1 MeV = 1B cycles simulation
+		EntropyFactor:       1.0,
+		DissipationRate:     0.0,
+		StabilityFactor:     1.0,
+		InteractionStrength: request.InitialEnergyMeV / 1000.0,
+		Active:              true,
+		TotalEnergyMeV:      request.InitialEnergyMeV,
+		CreatedAt:           time.Now(),
+		LastUpdated:         time.Now(),
+		Status:              "active",
+	}
 
 	// We store the field in our tracking system
 	s.fieldsMutex.Lock()
@@ -1433,7 +1431,7 @@ func (s *TernaryFissionAPIServer) getSystemStatus(w http.ResponseWriter, r *http
 	activeFields := len(s.energyFields)
 	totalEnergy := 0.0
 	for _, field := range s.energyFields {
-		totalEnergy += field.CurrentEnergyMeV
+		totalEnergy += field.EnergyMeV
 	}
 	s.fieldsMutex.RUnlock()
 
@@ -1444,9 +1442,9 @@ func (s *TernaryFissionAPIServer) getSystemStatus(w http.ResponseWriter, r *http
 		TotalFissionEvents:   uint64(activeFields * 100), // Simulated based on fields
 		TotalEnergySimulated: totalEnergy,
 		ActiveEnergyFields:   activeFields,
-		PeakMemoryUsage:      uint64(totalEnergy * 1e6), // Based on energy mapping
+		PeakMemoryUsage:      uint64(totalEnergy * 1e6),          // Based on energy mapping
 		AverageCalcTime:      125.5 + float64(activeFields)*10.0, // Scales with load
-		TotalCalculations:    uint64(activeFields * 250), // Simulated
+		TotalCalculations:    uint64(activeFields * 250),         // Simulated
 		SimulationRunning:    s.simulationRunning.Load(),
 		CPUUsagePercent:      25.0 + float64(activeFields)*5.0, // Simulated load
 		MemoryUsagePercent:   15.0 + float64(activeFields)*3.0, // Simulated usage
@@ -1470,7 +1468,7 @@ func (s *TernaryFissionAPIServer) listEnergyFields(w http.ResponseWriter, r *htt
 		"total_energy": func() float64 {
 			total := 0.0
 			for _, field := range fields {
-				total += field.CurrentEnergyMeV
+				total += field.EnergyMeV
 			}
 			return total
 		}(),
@@ -1517,7 +1515,7 @@ func (s *TernaryFissionAPIServer) deleteEnergyField(w http.ResponseWriter, r *ht
 		delete(s.energyFields, fieldID)
 		if s.config.PrometheusEnabled {
 			s.activeFieldsGauge.Dec()
-			s.energyTotalGauge.Sub(field.CurrentEnergyMeV)
+			s.energyTotalGauge.Sub(field.EnergyMeV)
 		}
 	}
 	s.fieldsMutex.Unlock()
@@ -1529,7 +1527,7 @@ func (s *TernaryFissionAPIServer) deleteEnergyField(w http.ResponseWriter, r *ht
 
 	log.Printf("Deleted energy field %s", fieldID)
 	s.writeJSONResponse(w, http.StatusOK, map[string]string{
-		"message": "Energy field deleted successfully",
+		"message":  "Energy field deleted successfully",
 		"field_id": fieldID,
 	})
 }
@@ -1557,18 +1555,18 @@ func (s *TernaryFissionAPIServer) handleWebSocketConnection(w http.ResponseWrite
 			totalEnergy := 0.0
 			fieldsList := make([]string, 0, len(s.energyFields))
 			for id, field := range s.energyFields {
-				totalEnergy += field.CurrentEnergyMeV
+				totalEnergy += field.EnergyMeV
 				fieldsList = append(fieldsList, id)
 			}
 			s.fieldsMutex.RUnlock()
 
 			update := map[string]interface{}{
-				"timestamp":         time.Now(),
-				"active_fields":     activeFields,
-				"total_energy":      totalEnergy,
+				"timestamp":          time.Now(),
+				"active_fields":      activeFields,
+				"total_energy":       totalEnergy,
 				"simulation_running": s.simulationRunning.Load(),
-				"uptime_seconds":    int64(time.Since(s.startTime).Seconds()),
-				"field_ids":         fieldsList,
+				"uptime_seconds":     int64(time.Since(s.startTime).Seconds()),
+				"field_ids":          fieldsList,
 			}
 
 			if err := conn.WriteJSON(update); err != nil {
@@ -1585,22 +1583,17 @@ func (s *TernaryFissionAPIServer) dissipateEnergyField(w http.ResponseWriter, r 
 }
 
 func (s *TernaryFissionAPIServer) autoDissipateField(fieldID string, rounds int) {
-	// We simulate gradual energy dissipation over time
 	log.Printf("Starting auto-dissipation for field %s with %d rounds", fieldID, rounds)
 
 	for i := 0; i < rounds; i++ {
-		time.Sleep(2 * time.Second) // Simulate dissipation time
+		time.Sleep(2 * time.Second)
 
 		s.fieldsMutex.Lock()
 		if field, exists := s.energyFields[fieldID]; exists {
-			// We apply exponential decay
-			field.CurrentEnergyMeV *= 0.95 // 5% energy loss per round
-			field.EnergyDissipated = field.InitialEnergyMeV - field.CurrentEnergyMeV
-			field.EncryptionRounds = i + 1
+			field.EnergyMeV *= 0.95 // 5% energy loss per round
 			field.LastUpdated = time.Now()
 
-			// We check if energy level is too low
-			if field.CurrentEnergyMeV < field.InitialEnergyMeV * 0.01 {
+			if field.EnergyMeV < 0.01 {
 				field.Status = "dissipated"
 				log.Printf("Energy field %s fully dissipated after %d rounds", fieldID, i+1)
 				s.fieldsMutex.Unlock()
@@ -1631,7 +1624,7 @@ func (s *TernaryFissionAPIServer) writeJSONResponse(w http.ResponseWriter, statu
 
 func (s *TernaryFissionAPIServer) writeErrorResponse(w http.ResponseWriter, status int, message string) {
 	s.writeJSONResponse(w, status, map[string]string{
-		"error": message,
+		"error":     message,
 		"timestamp": time.Now().Format(time.RFC3339),
 	})
 }
@@ -1683,13 +1676,13 @@ func (s *TernaryFissionAPIServer) healthCheck(w http.ResponseWriter, r *http.Req
 	s.fieldsMutex.RUnlock()
 
 	health := map[string]interface{}{
-		"status": "healthy",
-		"timestamp": time.Now().Format(time.RFC3339),
-		"uptime_seconds": int64(uptime.Seconds()),
+		"status":               "healthy",
+		"timestamp":            time.Now().Format(time.RFC3339),
+		"uptime_seconds":       int64(uptime.Seconds()),
 		"active_energy_fields": activeFields,
-		"simulation_running": s.simulationRunning.Load(),
-		"version": "1.1.13",
-		"author": "bthlops (David StJ)",
+		"simulation_running":   s.simulationRunning.Load(),
+		"version":              "1.1.13",
+		"author":               "bthlops (David StJ)",
 	}
 
 	s.writeJSONResponse(w, http.StatusOK, health)
