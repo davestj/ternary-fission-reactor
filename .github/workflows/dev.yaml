@@ -33,11 +33,14 @@ jobs:
         run: |
           if command -v sudo >/dev/null 2>&1; then
             sudo apt-get update
-            sudo apt-get install -y build-essential gcc g++ cmake make libssl-dev pkg-config
+            sudo apt-get install -y build-essential gcc g++ cmake make libssl-dev pkg-config libjsoncpp-dev
           else
             apt-get update
-            apt-get install -y build-essential gcc g++ cmake make libssl-dev pkg-config
+            apt-get install -y build-essential gcc g++ cmake make libssl-dev pkg-config libjsoncpp-dev
           fi
+
+      - name: Verify jsoncpp pkg-config
+        run: pkg-config --cflags --libs jsoncpp
 
       - name: Build C++ components
         run: make cpp-build
