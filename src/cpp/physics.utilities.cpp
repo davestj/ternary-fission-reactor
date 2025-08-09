@@ -680,6 +680,11 @@ PerformanceMetrics getCurrentPerformanceMetrics() {
     double cpu_time = usage.ru_utime.tv_sec + usage.ru_utime.tv_usec / 1e6 +
                       usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1e6;
     metrics.cpu_utilization_percent = cpu_time * 100.0;
+    metrics.cpu_time_seconds = cpu_time;
+
+    // Page faults and context switches
+    metrics.page_faults = usage.ru_minflt + usage.ru_majflt;
+    metrics.context_switches = usage.ru_nvcsw + usage.ru_nivcsw;
 
     // Placeholder metrics not yet collected
     metrics.events_per_second = 0.0;

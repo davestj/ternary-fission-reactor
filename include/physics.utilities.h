@@ -206,8 +206,11 @@ struct PerformanceMetrics {
     double average_event_processing_time_ms;
     double memory_usage_mb;
     double cpu_utilization_percent;
+    double cpu_time_seconds;
     std::uint64_t total_energy_fields_active;
     std::uint64_t total_memory_pool_allocated;
+    std::uint64_t page_faults;
+    std::uint64_t context_switches;
     std::chrono::steady_clock::time_point measurement_time;
 };
 
