@@ -106,8 +106,7 @@ std::string energyFieldToJSON(const EnergyField& field) {
 
     // Memory mapping details
     if (field.memory_ptr && field.memory_bytes > 0) {
-        json_field["memory_address"] = static_cast<Json::UInt64>(
-            reinterpret_cast<uintptr_t>(field.memory_ptr));
+        json_field["memory_address"] = static_cast<Json::UInt64>(reinterpret_cast<uintptr_t>(field.memory_ptr));
 
         // Calculate memory entropy for monitoring
         double memory_entropy = calculateEntropy(field.memory_bytes, field.cpu_cycles);
