@@ -10,6 +10,7 @@
 # - 2025-07-31: Fixed jsoncpp include path issues for both macOS and Ubuntu
 # - 2025-07-31: Added static linking configuration for .deb distribution
 # - 2025-07-31: Integrated Makefile updates and testing procedures
+# - 2025-07-31: Added jsoncpp pkg-config detection and PKG_CONFIG_PATH export
 #
 # Usage:
 # chmod +x setup_build_environment.sh
@@ -72,6 +73,32 @@ detect_platform() {
 # Check if command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
+}
+
+# Ensure jsoncpp pkg-config file is discoverable
+ensure_jsoncpp_pkgconfig() {
+    if pkg-config --exists jsoncpp; then
+        log_info "\u2713 jsoncpp found via pkg-config"
+        return
+    fi
+
+    log_warn "jsoncpp.pc not found in PKG_CONFIG_PATH, attempting to locate..."
+    local pc_file
+    if [[ "$PLATFORM" == "macos" ]]; then
+        local brew_prefix=$(brew --prefix jsoncpp 2>/dev/null || brew --prefix)
+        pc_file=$(find "$brew_prefix" -path "*/pkgconfig/jsoncpp.pc" 2>/dev/null | head -n 1)
+    else
+        pc_file=$(find /usr /usr/local -path "*/pkgconfig/jsoncpp.pc" 2>/dev/null | head -n 1)
+    fi
+
+    if [ -n "$pc_file" ]; then
+        local pc_dir="$(dirname "$pc_file")"
+        export PKG_CONFIG_PATH="$pc_dir:${PKG_CONFIG_PATH:-}"
+        log_info "Added $pc_dir to PKG_CONFIG_PATH"
+    else
+        log_error "jsoncpp.pc could not be located"
+        exit 1
+    fi
 }
 
 # Install macOS dependencies
@@ -419,7 +446,9 @@ main() {
             exit 1
             ;;
     esac
-    
+
+    ensure_jsoncpp_pkgconfig
+
     test_compilation
     update_makefile
     create_debian_files
