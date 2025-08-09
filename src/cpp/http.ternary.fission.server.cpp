@@ -1390,7 +1390,6 @@ void HTTPTernaryFissionServer::handleEnergyGeneration(const httplib::Request& re
         auto time_since_epoch = field.creation_time.time_since_epoch();
         auto timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count();
         jf["creation_time_ms"] = static_cast<Json::Int64>(timestamp_ms);
-        jf["memory_allocated"] = (field.memory_ptr != nullptr && field.memory_bytes > 0);
 
         sendJSONResponse(res, 200, jf);
     } catch (const std::exception& e) {

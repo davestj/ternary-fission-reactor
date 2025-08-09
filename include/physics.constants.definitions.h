@@ -13,6 +13,7 @@
  * 2025-07-30: FIXED missing standard library includes causing size_t compilation errors
  *             Added complete C++ standard library headers for GCC 12.2/13.3 compatibility
  *             Ensures proper Ubuntu 24.04 and Debian 12 compatibility
+ * 2025-07-31: Updated EnergyField defaults and cleaned legacy references
  *
  * Carry-over Context:
  * - We use these constants throughout the C++ simulation engine
