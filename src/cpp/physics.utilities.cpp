@@ -64,6 +64,10 @@
 
 namespace TernaryFission {
 
+// Forward declarations for internal utility functions
+static void encryptMemoryPattern(void* memory_ptr, size_t memory_size, uint64_t field_id);
+static void applyEntropyToMemory(void* memory_ptr, size_t memory_size, double entropy_factor);
+
 // Global thread-local storage for random number generators
 thread_local std::mt19937_64 tl_rng(std::random_device{}());
 
@@ -660,7 +664,7 @@ void cleanupPhysicsUtilities() {
  * We provide real-time performance monitoring
  */
 PerformanceMetrics getCurrentPerformanceMetrics() {
-    PerformanceMetrics metrics;
+    PerformanceMetrics metrics{};
     metrics.measurement_time = std::chrono::steady_clock::now();
 
     // Get process resource usage
@@ -670,16 +674,16 @@ PerformanceMetrics getCurrentPerformanceMetrics() {
     // Memory usage
     metrics.memory_usage_mb = usage.ru_maxrss / 1024.0;  // Convert KB to MB
 
-    // CPU time
+    // CPU utilization (approximate)
     double cpu_time = usage.ru_utime.tv_sec + usage.ru_utime.tv_usec / 1e6 +
-                     usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1e6;
-    metrics.cpu_time_seconds = cpu_time;
+                      usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1e6;
+    metrics.cpu_utilization_percent = cpu_time * 100.0;
 
-    // Page faults
-    metrics.page_faults = usage.ru_majflt + usage.ru_minflt;
-
-    // Context switches
-    metrics.context_switches = usage.ru_nvcsw + usage.ru_nivcsw;
+    // Placeholder metrics not yet collected
+    metrics.events_per_second = 0.0;
+    metrics.average_event_processing_time_ms = 0.0;
+    metrics.total_energy_fields_active = 0;
+    metrics.total_memory_pool_allocated = 0;
 
     return metrics;
 }
