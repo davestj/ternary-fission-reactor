@@ -174,7 +174,7 @@ TEST_BINARIES := $(FD_COUNT_TEST) $(SYSTEM_METRICS_TEST) $(INTEGRATION_TEST)
 # =============================================================================
 # TARGETS
 # =============================================================================
-.PHONY: all help clean test qa install docker release dist deb test-fd test-metrics test-integration
+.PHONY: all cpp-build help clean test qa install docker release dist deb test-fd test-metrics test-integration
 
 all: info $(CPP_MAIN) go-build
 
@@ -215,6 +215,12 @@ $(TEST_BUILD_DIR):
 $(BUILD_SUBDIR)/%.o: $(CPP_SRC_DIR)/%.cpp | $(BUILD_SUBDIR)
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
 
+
+# =============================================================================
+# C++ BUILD
+# =============================================================================
+cpp-build: $(CPP_MAIN)
+	@echo "✓ C++ components built"
 
 # =============================================================================
 # GO BUILD
