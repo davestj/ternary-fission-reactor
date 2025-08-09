@@ -143,17 +143,17 @@ BIN_DIR := bin
 DIST_DIR := dist
 TEST_DIR := tests
 
+BUILD_TYPE ?= release
+BUILD_SUBDIR := $(BUILD_DIR)/$(BUILD_TYPE)
+
 # Source files
 CPP_SOURCES := $(wildcard $(SRC_DIR)/cpp/*.cpp)
 CPP_HEADERS := $(wildcard $(INCLUDE_DIR)/*.h)
 GO_SOURCES := $(wildcard $(SRC_DIR)/go/*.go)
 
 # Object files (exclude main files to avoid multiple main definitions)
-CPP_OBJS := $(BUILD_DIR)/$(BUILD_TYPE)/physics.utilities.o \
-	    $(BUILD_DIR)/$(BUILD_TYPE)/ternary.fission.simulation.engine.o
-
-BUILD_TYPE ?= release
-BUILD_SUBDIR := $(BUILD_DIR)/$(BUILD_TYPE)
+CPP_OBJS := $(BUILD_SUBDIR)/physics.utilities.o \
+            $(BUILD_SUBDIR)/ternary.fission.simulation.engine.o
 
 
 CPP_SOURCES := $(wildcard $(CPP_SRC_DIR)/*.cpp)
