@@ -128,25 +128,36 @@ namespace TernaryFission {
      * This structure contains all three fragments and conservation laws
      */
     struct TernaryFissionEvent {
+        std::uint64_t event_id;            // Unique event identifier
+        std::uint64_t energy_field_id;     // Associated energy field identifier
+
         NuclearFragment light_fragment;    // Lighter fission fragment
         NuclearFragment heavy_fragment;    // Heavier fission fragment
         NuclearFragment alpha_particle;    // Third particle (usually alpha)
 
         double total_kinetic_energy;       // Total KE released (MeV)
         double q_value;                    // Q-value of reaction (MeV)
+        double binding_energy_released;    // Binding energy released (MeV)
 
         // Conservation verification
         bool momentum_conserved;
         bool energy_conserved;
+        double energy_conservation_error;    // Energy conservation deviation (MeV)
+        double momentum_conservation_error;  // Momentum conservation deviation (MeV/c)
         bool mass_number_conserved;
         bool charge_conserved;
 
         // Simulation timestamp
         std::chrono::high_resolution_clock::time_point timestamp;
 
-        TernaryFissionEvent() : total_kinetic_energy(0.0), q_value(0.0),
+        TernaryFissionEvent() : event_id(0), energy_field_id(0),
+                               total_kinetic_energy(0.0), q_value(0.0),
+                               binding_energy_released(0.0),
                                momentum_conserved(false), energy_conserved(false),
-                               mass_number_conserved(false), charge_conserved(false) {}
+                               energy_conservation_error(0.0),
+                               momentum_conservation_error(0.0),
+                               mass_number_conserved(false),
+                               charge_conserved(false) {}
     };
 
     /**
