@@ -154,25 +154,23 @@ namespace TernaryFission {
      * Memory allocation and CPU cycles represent energy field intensity
      */
     struct EnergyField {
-        std::size_t memory_allocated;          // Bytes allocated to represent energy
-        std::uint64_t cpu_cycles_consumed;     // CPU cycles used for calculations
-        double current_energy_level;           // Current energy in MeV
-        double initial_energy_level;           // Starting energy level
-        double entropy_factor;                 // Thermodynamic entropy component
+        std::uint64_t field_id;                                            // Unique field identifier
+        double energy_mev;                                                 // Energy level in MeV
+        std::size_t memory_bytes;                                         // Bytes allocated to represent energy
+        std::uint64_t cpu_cycles;                                         // CPU cycles used for calculations
+        double entropy_factor;                                            // Thermodynamic entropy component
+        double dissipation_rate;                                          // Energy dissipation rate
+        double stability_factor;                                          // Field stability coefficient
+        double interaction_strength;                                      // Interaction strength coefficient
+        std::chrono::high_resolution_clock::time_point creation_time;     // Creation timestamp
+        void* memory_ptr;                                                 // Pointer to allocated memory
 
-        // Encryption-based dissipation tracking
-        int encryption_rounds_completed;
-        double energy_dissipated;
-
-        // Timing and performance metrics
-        std::chrono::microseconds computation_time;
-        double energy_dissipation_rate;        // MeV/second
-
-        EnergyField() : memory_allocated(0), cpu_cycles_consumed(0),
-                       current_energy_level(0.0), initial_energy_level(0.0),
-                       entropy_factor(1.0), encryption_rounds_completed(0),
-                       energy_dissipated(0.0), computation_time(0),
-                       energy_dissipation_rate(0.0) {}
+        EnergyField() : field_id(0), energy_mev(0.0),
+                       memory_bytes(0), cpu_cycles(0),
+                       entropy_factor(1.0), dissipation_rate(0.0),
+                       stability_factor(1.0), interaction_strength(0.0),
+                       creation_time(std::chrono::high_resolution_clock::now()),
+                       memory_ptr(nullptr) {}
     };
 
     /**
