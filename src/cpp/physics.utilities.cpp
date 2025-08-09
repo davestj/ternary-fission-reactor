@@ -104,9 +104,7 @@ std::string energyFieldToJSON(const EnergyField& field) {
     auto timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count();
     json_field["creation_time_ms"] = static_cast<Json::Int64>(timestamp_ms);
 
-    // Memory allocation status
-    json_field["memory_allocated"] = (field.memory_ptr != nullptr && field.memory_bytes > 0);
-
+    // Memory mapping details
     if (field.memory_ptr && field.memory_bytes > 0) {
         json_field["memory_address"] = static_cast<Json::UInt64>(
             reinterpret_cast<uintptr_t>(field.memory_ptr));

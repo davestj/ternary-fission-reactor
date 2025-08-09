@@ -500,11 +500,8 @@ Json::Value TernaryFissionSimulationEngine::serializeEnergyFieldToJSON(const Ene
 
     // Memory mapping info
     if (field.memory_ptr && field.memory_bytes > 0) {
-        json_field["memory_allocated"] = true;
         json_field["memory_address"] = static_cast<Json::UInt64>(
             reinterpret_cast<uintptr_t>(field.memory_ptr));
-    } else {
-        json_field["memory_allocated"] = false;
     }
 
     return json_field;
