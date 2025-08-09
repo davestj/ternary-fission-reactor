@@ -1274,13 +1274,25 @@ void HTTPTernaryFissionServer::handleFissionCalculation(const httplib::Request& 
         response["q_value"] = event.q_value;
         response["total_kinetic_energy"] = event.total_kinetic_energy;
 
-        auto serializeFragment = [](const NuclearFragment& frag) {
+        auto serializeFragment = [](const FissionFragment& frag) {
             Json::Value jf;
             jf["mass"] = frag.mass;
+            jf["atomic_number"] = static_cast<Json::Int64>(frag.atomic_number);
+            jf["mass_number"] = static_cast<Json::Int64>(frag.mass_number);
             jf["kinetic_energy"] = frag.kinetic_energy;
-            jf["momentum_x"] = frag.momentum_x;
-            jf["momentum_y"] = frag.momentum_y;
-            jf["momentum_z"] = frag.momentum_z;
+            jf["binding_energy"] = frag.binding_energy;
+            jf["excitation_energy"] = frag.excitation_energy;
+            jf["half_life"] = frag.half_life;
+            Json::Value momentum;
+            momentum["x"] = frag.momentum.x;
+            momentum["y"] = frag.momentum.y;
+            momentum["z"] = frag.momentum.z;
+            jf["momentum"] = momentum;
+            Json::Value position;
+            position["x"] = frag.position.x;
+            position["y"] = frag.position.y;
+            position["z"] = frag.position.z;
+            jf["position"] = position;
             return jf;
         };
 
@@ -1307,12 +1319,22 @@ void HTTPTernaryFissionServer::handleConservationLaws(const httplib::Request& re
         TernaryFissionEvent event;
         event.q_value = body.get("q_value", 0.0).asDouble();
 
-        auto parseFragment = [](const Json::Value& jf, NuclearFragment& frag) {
-            frag.kinetic_energy = jf.get("kinetic_energy", 0.0).asDouble();
-            frag.momentum_x = jf.get("momentum_x", 0.0).asDouble();
-            frag.momentum_y = jf.get("momentum_y", 0.0).asDouble();
-            frag.momentum_z = jf.get("momentum_z", 0.0).asDouble();
+        auto parseFragment = [](const Json::Value& jf, FissionFragment& frag) {
             frag.mass = jf.get("mass", 0.0).asDouble();
+            frag.atomic_number = jf.get("atomic_number", 0).asInt();
+            frag.mass_number = jf.get("mass_number", 0).asInt();
+            frag.kinetic_energy = jf.get("kinetic_energy", 0.0).asDouble();
+            frag.binding_energy = jf.get("binding_energy", 0.0).asDouble();
+            frag.excitation_energy = jf.get("excitation_energy", 0.0).asDouble();
+            frag.half_life = jf.get("half_life", 0.0).asDouble();
+            const Json::Value& momentum = jf["momentum"];
+            frag.momentum.x = momentum.get("x", 0.0).asDouble();
+            frag.momentum.y = momentum.get("y", 0.0).asDouble();
+            frag.momentum.z = momentum.get("z", 0.0).asDouble();
+            const Json::Value& position = jf["position"];
+            frag.position.x = position.get("x", 0.0).asDouble();
+            frag.position.y = position.get("y", 0.0).asDouble();
+            frag.position.z = position.get("z", 0.0).asDouble();
         };
 
         parseFragment(body["heavy_fragment"], event.heavy_fragment);

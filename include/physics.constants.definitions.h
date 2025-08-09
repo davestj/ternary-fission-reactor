@@ -105,22 +105,33 @@ namespace TernaryFission {
     // =============================================================================
 
     /**
-     * We define the nuclear fragment structure to represent fission products
-     * Each fragment carries mass, energy, momentum, and decay properties
+     * Simple 3D vector structure for momentum and position
      */
-    struct NuclearFragment {
+    struct Vector3 {
+        double x, y, z;
+
+        Vector3() : x(0.0), y(0.0), z(0.0) {}
+    };
+
+    /**
+     * We define the fission fragment structure to represent decay products
+     * Each fragment carries mass, energy, momentum, position and decay properties
+     */
+    struct FissionFragment {
         double mass;              // Fragment mass in atomic mass units
-        double kinetic_energy;    // Kinetic energy in MeV
-        double momentum_x;        // Momentum components (MeV/c)
-        double momentum_y;
-        double momentum_z;
         int atomic_number;        // Number of protons
         int mass_number;          // Number of nucleons
+        double kinetic_energy;    // Kinetic energy in MeV
+        double binding_energy;    // Binding energy in MeV
+        double excitation_energy; // Excitation energy in MeV
+        Vector3 momentum;         // Momentum vector (MeV/c)
+        Vector3 position;         // Position vector (fm or arbitrary units)
         double half_life;         // Decay half-life in seconds
 
-        NuclearFragment() : mass(0.0), kinetic_energy(0.0),
-                           momentum_x(0.0), momentum_y(0.0), momentum_z(0.0),
-                           atomic_number(0), mass_number(0), half_life(0.0) {}
+        FissionFragment()
+            : mass(0.0), atomic_number(0), mass_number(0),
+              kinetic_energy(0.0), binding_energy(0.0), excitation_energy(0.0),
+              momentum(), position(), half_life(0.0) {}
     };
 
     /**
@@ -131,9 +142,9 @@ namespace TernaryFission {
         std::uint64_t event_id;            // Unique event identifier
         std::uint64_t energy_field_id;     // Associated energy field identifier
 
-        NuclearFragment light_fragment;    // Lighter fission fragment
-        NuclearFragment heavy_fragment;    // Heavier fission fragment
-        NuclearFragment alpha_particle;    // Third particle (usually alpha)
+        FissionFragment light_fragment;    // Lighter fission fragment
+        FissionFragment heavy_fragment;    // Heavier fission fragment
+        FissionFragment alpha_particle;    // Third particle (usually alpha)
 
         double total_kinetic_energy;       // Total KE released (MeV)
         double q_value;                    // Q-value of reaction (MeV)
@@ -249,8 +260,8 @@ namespace TernaryFission {
     // =============================================================================
 
     // We declare utility functions for physics calculations
-    double calculateTernaryFissionQ(double parent_mass, const NuclearFragment& frag1,
-                                   const NuclearFragment& frag2, const NuclearFragment& frag3);
+    double calculateTernaryFissionQ(double parent_mass, const FissionFragment& frag1,
+                                   const FissionFragment& frag2, const FissionFragment& frag3);
 
     bool verifyMomentumConservation(const TernaryFissionEvent& event, double tolerance = 1e-6);
     bool verifyEnergyConservation(const TernaryFissionEvent& event, double tolerance = 1e-3);
