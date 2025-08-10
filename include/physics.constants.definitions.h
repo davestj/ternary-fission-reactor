@@ -13,6 +13,7 @@
  * 2025-07-30: FIXED missing standard library includes causing size_t compilation errors
  *             Added complete C++ standard library headers for GCC 12.2/13.3 compatibility
  *             Ensures proper Ubuntu 24.04 and Debian 12 compatibility
+ * 2025-07-31: Updated EnergyField defaults and cleaned legacy references
  *
  * Carry-over Context:
  * - We use these constants throughout the C++ simulation engine
@@ -105,22 +106,33 @@ namespace TernaryFission {
     // =============================================================================
 
     /**
-     * We define the nuclear fragment structure to represent fission products
-     * Each fragment carries mass, energy, momentum, and decay properties
+     * Simple 3D vector structure for momentum and position
      */
-    struct NuclearFragment {
+    struct Vector3 {
+        double x, y, z;
+
+        Vector3() : x(0.0), y(0.0), z(0.0) {}
+    };
+
+    /**
+     * We define the fission fragment structure to represent decay products
+     * Each fragment carries mass, energy, momentum, position and decay properties
+     */
+    struct FissionFragment {
         double mass;              // Fragment mass in atomic mass units
-        double kinetic_energy;    // Kinetic energy in MeV
-        double momentum_x;        // Momentum components (MeV/c)
-        double momentum_y;
-        double momentum_z;
         int atomic_number;        // Number of protons
         int mass_number;          // Number of nucleons
+        double kinetic_energy;    // Kinetic energy in MeV
+        double binding_energy;    // Binding energy in MeV
+        double excitation_energy; // Excitation energy in MeV
+        Vector3 momentum;         // Momentum vector (MeV/c)
+        Vector3 position;         // Position vector (fm or arbitrary units)
         double half_life;         // Decay half-life in seconds
 
-        NuclearFragment() : mass(0.0), kinetic_energy(0.0),
-                           momentum_x(0.0), momentum_y(0.0), momentum_z(0.0),
-                           atomic_number(0), mass_number(0), half_life(0.0) {}
+        FissionFragment()
+            : mass(0.0), atomic_number(0), mass_number(0),
+              kinetic_energy(0.0), binding_energy(0.0), excitation_energy(0.0),
+              momentum(), position(), half_life(0.0) {}
     };
 
     /**
@@ -128,25 +140,36 @@ namespace TernaryFission {
      * This structure contains all three fragments and conservation laws
      */
     struct TernaryFissionEvent {
-        NuclearFragment light_fragment;    // Lighter fission fragment
-        NuclearFragment heavy_fragment;    // Heavier fission fragment
-        NuclearFragment alpha_particle;    // Third particle (usually alpha)
+        std::uint64_t event_id;            // Unique event identifier
+        std::uint64_t energy_field_id;     // Associated energy field identifier
+
+        FissionFragment light_fragment;    // Lighter fission fragment
+        FissionFragment heavy_fragment;    // Heavier fission fragment
+        FissionFragment alpha_particle;    // Third particle (usually alpha)
 
         double total_kinetic_energy;       // Total KE released (MeV)
         double q_value;                    // Q-value of reaction (MeV)
+        double binding_energy_released;    // Binding energy released (MeV)
 
         // Conservation verification
         bool momentum_conserved;
         bool energy_conserved;
+        double energy_conservation_error;    // Energy conservation deviation (MeV)
+        double momentum_conservation_error;  // Momentum conservation deviation (MeV/c)
         bool mass_number_conserved;
         bool charge_conserved;
 
         // Simulation timestamp
         std::chrono::high_resolution_clock::time_point timestamp;
 
-        TernaryFissionEvent() : total_kinetic_energy(0.0), q_value(0.0),
+        TernaryFissionEvent() : event_id(0), energy_field_id(0),
+                               total_kinetic_energy(0.0), q_value(0.0),
+                               binding_energy_released(0.0),
                                momentum_conserved(false), energy_conserved(false),
-                               mass_number_conserved(false), charge_conserved(false) {}
+                               energy_conservation_error(0.0),
+                               momentum_conservation_error(0.0),
+                               mass_number_conserved(false),
+                               charge_conserved(false) {}
     };
 
     /**
@@ -154,25 +177,23 @@ namespace TernaryFission {
      * Memory allocation and CPU cycles represent energy field intensity
      */
     struct EnergyField {
-        std::size_t memory_allocated;          // Bytes allocated to represent energy
-        std::uint64_t cpu_cycles_consumed;     // CPU cycles used for calculations
-        double current_energy_level;           // Current energy in MeV
-        double initial_energy_level;           // Starting energy level
-        double entropy_factor;                 // Thermodynamic entropy component
+        std::uint64_t field_id;                                            // Unique field identifier
+        double energy_mev;                                                 // Energy level in MeV
+        std::size_t memory_bytes;                                         // Bytes allocated to represent energy
+        std::uint64_t cpu_cycles;                                         // CPU cycles used for calculations
+        double entropy_factor;                                            // Thermodynamic entropy component
+        double dissipation_rate;                                          // Energy dissipation rate
+        double stability_factor;                                          // Field stability coefficient
+        double interaction_strength;                                      // Interaction strength coefficient
+        std::chrono::high_resolution_clock::time_point creation_time;     // Creation timestamp
+        void* memory_ptr;                                                 // Pointer to allocated memory
 
-        // Encryption-based dissipation tracking
-        int encryption_rounds_completed;
-        double energy_dissipated;
-
-        // Timing and performance metrics
-        std::chrono::microseconds computation_time;
-        double energy_dissipation_rate;        // MeV/second
-
-        EnergyField() : memory_allocated(0), cpu_cycles_consumed(0),
-                       current_energy_level(0.0), initial_energy_level(0.0),
-                       entropy_factor(1.0), encryption_rounds_completed(0),
-                       energy_dissipated(0.0), computation_time(0),
-                       energy_dissipation_rate(0.0) {}
+        EnergyField() : field_id(0), energy_mev(0.0),
+                       memory_bytes(0), cpu_cycles(0),
+                       entropy_factor(1.0), dissipation_rate(0.0),
+                       stability_factor(1.0), interaction_strength(0.0),
+                       creation_time(std::chrono::high_resolution_clock::now()),
+                       memory_ptr(nullptr) {}
     };
 
     /**
@@ -240,14 +261,14 @@ namespace TernaryFission {
     // =============================================================================
 
     // We declare utility functions for physics calculations
-    double calculateTernaryFissionQ(double parent_mass, const NuclearFragment& frag1,
-                                   const NuclearFragment& frag2, const NuclearFragment& frag3);
+    double calculateTernaryFissionQ(double parent_mass, const FissionFragment& frag1,
+                                   const FissionFragment& frag2, const FissionFragment& frag3);
 
     bool verifyMomentumConservation(const TernaryFissionEvent& event, double tolerance = 1e-6);
     bool verifyEnergyConservation(const TernaryFissionEvent& event, double tolerance = 1e-3);
 
     void allocateEnergyField(EnergyField& field, double energy_mev);
-    void dissipateEnergyField(EnergyField& field, int encryption_rounds);
+    void dissipateEnergyField(EnergyField& field);
 
     // We provide random number generation for physics simulation
     double generateGaussianRandom(SimulationState& state, double mean, double sigma);

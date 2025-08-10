@@ -63,6 +63,14 @@
 namespace TernaryFission {
 
 /*
+ * Create an energy field with specified energy
+ * We allocate computational resources to represent energy
+ */
+EnergyField TernaryFissionSimulationEngine::createEnergyField(double energy_mev) {
+    return ::TernaryFission::createEnergyField(energy_mev);
+}
+
+/*
  * Default constructor implementation
  * We use standard U-235 fission parameters
  */
@@ -82,10 +90,10 @@ TernaryFissionSimulationEngine::TernaryFissionSimulationEngine(double default_ma
       num_worker_threads(threads),
       total_events_simulated(0),
       total_energy_fields_created(0),
-      total_computation_time_seconds(0.0),
       shutdown_requested(false),
       continuous_mode_active(false),
       target_events_per_second(10.0),
+      total_computation_time_seconds(0.0),
       api_request_counter_(0),
       json_serialization_enabled_(true) {
 
@@ -200,7 +208,7 @@ Json::Value TernaryFissionSimulationEngine::simulateTernaryFissionEventAPI(const
         } catch (const std::exception& e) {
             Json::Value error;
             error["error"] = "Event simulation failed: " + std::string(e.what());
-            error["event_index"] = i;
+            error["event_index"] = static_cast<Json::Int64>(i);
             events_array.append(error);
         }
     }
@@ -210,7 +218,7 @@ Json::Value TernaryFissionSimulationEngine::simulateTernaryFissionEventAPI(const
 
     // Build response
     response["status"] = "success";
-    response["num_events"] = num_events;
+    response["num_events"] = static_cast<Json::Int64>(num_events);
     response["events"] = events_array;
     response["computation_time_microseconds"] = static_cast<Json::Int64>(duration.count());
     response["request_id"] = static_cast<Json::Int64>(api_request_counter_);
@@ -242,8 +250,9 @@ Json::Value TernaryFissionSimulationEngine::getSystemStatusAPI() const {
         status["total_computation_time_seconds"] = total_computation_time_seconds;
     }
 
-    status["worker_threads"] = num_worker_threads;
-    status["active_energy_fields"] = static_cast<int>(simulation_state.active_energy_fields.size());
+    status["worker_threads"] = static_cast<Json::Int64>(num_worker_threads);
+    status["active_energy_fields"] = static_cast<Json::Int64>(
+        simulation_state.active_energy_fields.size());
     status["energy_conservation_enabled"] = simulation_state.energy_conservation_enabled;
     status["momentum_conservation_enabled"] = simulation_state.momentum_conservation_enabled;
     status["target_events_per_second"] = target_events_per_second.load();
@@ -287,11 +296,12 @@ Json::Value TernaryFissionSimulationEngine::getEnergyFieldsAPI() const {
     Json::Value fields_array(Json::arrayValue);
 
     for (const auto& field : simulation_state.active_energy_fields) {
-        fields_array.append(serializeEnergyFieldToJSON(*field));
+        fields_array.append(serializeEnergyFieldToJSON(field));
     }
 
     response["energy_fields"] = fields_array;
-    response["total_fields"] = static_cast<int>(simulation_state.active_energy_fields.size());
+    response["total_fields"] = static_cast<Json::Int64>(
+        simulation_state.active_energy_fields.size());
     response["status"] = "success";
 
     return response;
@@ -353,7 +363,7 @@ Json::Value TernaryFissionSimulationEngine::createEnergyFieldAPI(const Json::Val
     }
 
     try {
-        auto field = createEnergyField(energy_mev);
+        EnergyField field = createEnergyField(energy_mev);
         std::lock_guard<std::mutex> lock(state_mutex);
         simulation_state.active_energy_fields.push_back(field);
         total_energy_fields_created.fetch_add(1, std::memory_order_relaxed);
@@ -361,7 +371,7 @@ Json::Value TernaryFissionSimulationEngine::createEnergyFieldAPI(const Json::Val
         Json::Value response;
         response["status"] = "success";
         response["message"] = "Energy field created successfully";
-        response["energy_field"] = serializeEnergyFieldToJSON(*field);
+        response["energy_field"] = serializeEnergyFieldToJSON(field);
 
         return response;
 
@@ -370,6 +380,19 @@ Json::Value TernaryFissionSimulationEngine::createEnergyFieldAPI(const Json::Val
         error["error"] = "Failed to create energy field: " + std::string(e.what());
         error["status"] = "error";
         return error;
+    }
+}
+
+/*
+ * Dissipate energy from an existing field
+ * We apply physics utility dissipation for the specified rounds
+ */
+void TernaryFissionSimulationEngine::dissipateEnergyField(EnergyField& field, int rounds) {
+    for (int i = 0; i < rounds; ++i) {
+        ::TernaryFission::dissipateEnergyField(field);
+        if (field.energy_mev <= 0.0) {
+            break;
+        }
     }
 }
 
@@ -388,32 +411,68 @@ Json::Value TernaryFissionSimulationEngine::serializeFissionEventToJSON(const Te
     // Fragment data
     Json::Value heavy_fragment;
     heavy_fragment["mass"] = event.heavy_fragment.mass;
-    heavy_fragment["atomic_number"] = event.heavy_fragment.atomic_number;
-    heavy_fragment["mass_number"] = event.heavy_fragment.mass_number;
+    heavy_fragment["atomic_number"] = static_cast<Json::Int64>(
+        event.heavy_fragment.atomic_number);
+    heavy_fragment["mass_number"] = static_cast<Json::Int64>(
+        event.heavy_fragment.mass_number);
     heavy_fragment["kinetic_energy"] = event.heavy_fragment.kinetic_energy;
-    heavy_fragment["momentum_x"] = event.heavy_fragment.momentum.x;
-    heavy_fragment["momentum_y"] = event.heavy_fragment.momentum.y;
-    heavy_fragment["momentum_z"] = event.heavy_fragment.momentum.z;
+    heavy_fragment["binding_energy"] = event.heavy_fragment.binding_energy;
+    heavy_fragment["excitation_energy"] = event.heavy_fragment.excitation_energy;
+    heavy_fragment["half_life"] = event.heavy_fragment.half_life;
+    Json::Value heavy_momentum;
+    heavy_momentum["x"] = event.heavy_fragment.momentum.x;
+    heavy_momentum["y"] = event.heavy_fragment.momentum.y;
+    heavy_momentum["z"] = event.heavy_fragment.momentum.z;
+    heavy_fragment["momentum"] = heavy_momentum;
+    Json::Value heavy_position;
+    heavy_position["x"] = event.heavy_fragment.position.x;
+    heavy_position["y"] = event.heavy_fragment.position.y;
+    heavy_position["z"] = event.heavy_fragment.position.z;
+    heavy_fragment["position"] = heavy_position;
     json_event["heavy_fragment"] = heavy_fragment;
 
     Json::Value light_fragment;
     light_fragment["mass"] = event.light_fragment.mass;
-    light_fragment["atomic_number"] = event.light_fragment.atomic_number;
-    light_fragment["mass_number"] = event.light_fragment.mass_number;
+    light_fragment["atomic_number"] = static_cast<Json::Int64>(
+        event.light_fragment.atomic_number);
+    light_fragment["mass_number"] = static_cast<Json::Int64>(
+        event.light_fragment.mass_number);
     light_fragment["kinetic_energy"] = event.light_fragment.kinetic_energy;
-    light_fragment["momentum_x"] = event.light_fragment.momentum.x;
-    light_fragment["momentum_y"] = event.light_fragment.momentum.y;
-    light_fragment["momentum_z"] = event.light_fragment.momentum.z;
+    light_fragment["binding_energy"] = event.light_fragment.binding_energy;
+    light_fragment["excitation_energy"] = event.light_fragment.excitation_energy;
+    light_fragment["half_life"] = event.light_fragment.half_life;
+    Json::Value light_momentum;
+    light_momentum["x"] = event.light_fragment.momentum.x;
+    light_momentum["y"] = event.light_fragment.momentum.y;
+    light_momentum["z"] = event.light_fragment.momentum.z;
+    light_fragment["momentum"] = light_momentum;
+    Json::Value light_position;
+    light_position["x"] = event.light_fragment.position.x;
+    light_position["y"] = event.light_fragment.position.y;
+    light_position["z"] = event.light_fragment.position.z;
+    light_fragment["position"] = light_position;
     json_event["light_fragment"] = light_fragment;
 
     Json::Value alpha_particle;
     alpha_particle["mass"] = event.alpha_particle.mass;
-    alpha_particle["atomic_number"] = event.alpha_particle.atomic_number;
-    alpha_particle["mass_number"] = event.alpha_particle.mass_number;
+    alpha_particle["atomic_number"] = static_cast<Json::Int64>(
+        event.alpha_particle.atomic_number);
+    alpha_particle["mass_number"] = static_cast<Json::Int64>(
+        event.alpha_particle.mass_number);
     alpha_particle["kinetic_energy"] = event.alpha_particle.kinetic_energy;
-    alpha_particle["momentum_x"] = event.alpha_particle.momentum.x;
-    alpha_particle["momentum_y"] = event.alpha_particle.momentum.y;
-    alpha_particle["momentum_z"] = event.alpha_particle.momentum.z;
+    alpha_particle["binding_energy"] = event.alpha_particle.binding_energy;
+    alpha_particle["excitation_energy"] = event.alpha_particle.excitation_energy;
+    alpha_particle["half_life"] = event.alpha_particle.half_life;
+    Json::Value alpha_momentum;
+    alpha_momentum["x"] = event.alpha_particle.momentum.x;
+    alpha_momentum["y"] = event.alpha_particle.momentum.y;
+    alpha_momentum["z"] = event.alpha_particle.momentum.z;
+    alpha_particle["momentum"] = alpha_momentum;
+    Json::Value alpha_position;
+    alpha_position["x"] = event.alpha_particle.position.x;
+    alpha_position["y"] = event.alpha_particle.position.y;
+    alpha_position["z"] = event.alpha_particle.position.z;
+    alpha_particle["position"] = alpha_position;
     json_event["alpha_particle"] = alpha_particle;
 
     // Energy data
@@ -462,10 +521,8 @@ Json::Value TernaryFissionSimulationEngine::serializeEnergyFieldToJSON(const Ene
 
     // Memory mapping info
     if (field.memory_ptr && field.memory_bytes > 0) {
-        json_field["memory_allocated"] = true;
-        json_field["memory_address"] = reinterpret_cast<uintptr_t>(field.memory_ptr);
-    } else {
-        json_field["memory_allocated"] = false;
+        json_field["memory_address"] = static_cast<Json::UInt64>(
+            reinterpret_cast<uintptr_t>(field.memory_ptr));
     }
 
     return json_field;
@@ -517,6 +574,54 @@ void TernaryFissionSimulationEngine::stopContinuousSimulation() {
     }
 
     std::cout << "Continuous simulation stopped" << std::endl;
+}
+
+/*
+ * Start a timed portal load
+ * We create an energy field and maintain it for the specified duration
+ */
+void TernaryFissionSimulationEngine::startPortalLoad(double duration_seconds, double power_level_mev) {
+    std::thread([this, duration_seconds, power_level_mev]() {
+        EnergyField field = createEnergyField(power_level_mev);
+        {
+            std::lock_guard<std::mutex> lock(state_mutex);
+            simulation_state.active_energy_fields.push_back(field);
+        }
+
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(static_cast<int64_t>(duration_seconds * 1000.0))
+        );
+
+        {
+            std::lock_guard<std::mutex> lock(state_mutex);
+            if (!simulation_state.active_energy_fields.empty()) {
+                simulation_state.active_energy_fields.pop_back();
+            }
+        }
+    }).detach();
+}
+
+void TernaryFissionSimulationEngine::setPortalEventState(
+    std::chrono::system_clock::time_point start,
+    std::chrono::system_clock::time_point end,
+    double estimated_power_mev) {
+    std::lock_guard<std::mutex> lock(state_mutex);
+    portal_start_time_ = start;
+    portal_end_time_ = end;
+    portal_estimated_power_mev_ = estimated_power_mev;
+}
+
+void TernaryFissionSimulationEngine::getPortalEventState(
+    double& estimated_power_mev, int& remaining_seconds) const {
+    std::lock_guard<std::mutex> lock(state_mutex);
+    estimated_power_mev = portal_estimated_power_mev_;
+    auto now = std::chrono::system_clock::now();
+    if (now >= portal_end_time_) {
+        remaining_seconds = 0;
+    } else {
+        remaining_seconds = static_cast<int>(
+            std::chrono::duration_cast<std::chrono::seconds>(portal_end_time_ - now).count());
+    }
 }
 
 /*
@@ -602,6 +707,10 @@ TernaryFissionEvent TernaryFissionSimulationEngine::generateFissionEvent(double 
     TernaryFissionEvent event;
     event.timestamp = std::chrono::high_resolution_clock::now();
 
+    static std::atomic<std::uint64_t> event_id_counter{1};
+    event.event_id = event_id_counter.fetch_add(1, std::memory_order_relaxed);
+    event.energy_field_id = generateFieldId();
+
     // Parent nucleus properties (U-235 defaults)
     const int parent_atomic_number = 92;
     const int parent_mass_number = static_cast<int>(parent_mass);
@@ -652,6 +761,7 @@ TernaryFissionEvent TernaryFissionSimulationEngine::generateFissionEvent(double 
     event.total_kinetic_energy = event.alpha_particle.kinetic_energy +
                                 event.light_fragment.kinetic_energy +
                                 event.heavy_fragment.kinetic_energy;
+    event.binding_energy_released = event.q_value - event.total_kinetic_energy;
 
     // Generate random momentum directions (conservation will be applied)
     generateRandomMomentum(event.alpha_particle);
@@ -660,6 +770,20 @@ TernaryFissionEvent TernaryFissionSimulationEngine::generateFissionEvent(double 
 
     // Apply conservation laws
     applyConservationLaws(event);
+
+    // Calculate conservation errors
+    event.energy_conservation_error = std::abs(event.q_value - event.total_kinetic_energy);
+    event.energy_conserved = event.energy_conservation_error < 1e-3;
+
+    double total_px = event.heavy_fragment.momentum.x + event.light_fragment.momentum.x +
+                      event.alpha_particle.momentum.x;
+    double total_py = event.heavy_fragment.momentum.y + event.light_fragment.momentum.y +
+                      event.alpha_particle.momentum.y;
+    double total_pz = event.heavy_fragment.momentum.z + event.light_fragment.momentum.z +
+                      event.alpha_particle.momentum.z;
+    event.momentum_conservation_error =
+        std::sqrt(total_px * total_px + total_py * total_py + total_pz * total_pz);
+    event.momentum_conserved = event.momentum_conservation_error < 1e-6;
 
     return event;
 }
@@ -671,8 +795,8 @@ TernaryFissionEvent TernaryFissionSimulationEngine::generateFissionEvent(double 
 void TernaryFissionSimulationEngine::processFissionEvent(const TernaryFissionEvent& event) {
     // Create energy field based on event
     try {
-        auto energy_field = createEnergyField(event.total_kinetic_energy);
-        energy_field->field_id = event.energy_field_id;
+        EnergyField energy_field = createEnergyField(event.total_kinetic_energy);
+        energy_field.field_id = event.energy_field_id;
 
         {
             std::lock_guard<std::mutex> lock(state_mutex);
@@ -695,6 +819,8 @@ void TernaryFissionSimulationEngine::processFissionEvent(const TernaryFissionEve
  * We process events from the queue in parallel
  */
 void TernaryFissionSimulationEngine::workerThreadFunction(int thread_id) {
+    (void)thread_id;
+
     while (!shutdown_requested.load()) {
         std::unique_lock<std::mutex> lock(queue_mutex);
 
@@ -766,10 +892,10 @@ void TernaryFissionSimulationEngine::updateEnergyFields() {
     auto it = simulation_state.active_energy_fields.begin();
     while (it != simulation_state.active_energy_fields.end()) {
         // Apply dissipation using physics utilities
-        ::TernaryFission::dissipateEnergyField(**it);
+        dissipateEnergyField(*it, 1);
 
         // Remove fields with very low energy
-        if ((*it)->energy_mev < 0.001) {
+        if (it->energy_mev < 0.001) {
             it = simulation_state.active_energy_fields.erase(it);
         } else {
             ++it;
@@ -782,6 +908,8 @@ void TernaryFissionSimulationEngine::updateEnergyFields() {
  * We record events for analysis
  */
 void TernaryFissionSimulationEngine::logFissionEvent(const TernaryFissionEvent& event) {
+    (void)event;
+
     // Event logging implementation would write to log files
     // For now, we just track in memory
 }

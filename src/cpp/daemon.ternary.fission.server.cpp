@@ -1,19 +1,3 @@
-#include "daemon.ternary.fission.server.h"
-
-namespace TernaryFission {
-
-DaemonTernaryFissionServer::DaemonTernaryFissionServer()
-    : configuration_(std::make_shared<Configuration>()) {}
-
-DaemonTernaryFissionServer::DaemonTernaryFissionServer(std::shared_ptr<Configuration> config)
-    : configuration_(std::move(config)) {
-    if (!configuration_) {
-        configuration_ = std::make_shared<Configuration>();
-    }
-}
-
-std::shared_ptr<Configuration> DaemonTernaryFissionServer::getConfiguration() const {
-    return configuration_;
 /*
  * File: src/cpp/daemon.ternary.fission.server.cpp
  * Author: bthlops (David StJ)
@@ -1081,6 +1065,10 @@ bool DaemonTernaryFissionServer::isAnotherInstanceRunning() const {
  */
 bool DaemonTernaryFissionServer::reloadConfiguration() {
     return config_manager_->reloadConfiguration();
+}
+
+ConfigurationManager* DaemonTernaryFissionServer::getConfiguration() const {
+    return config_manager_.get();
 }
 
 /**

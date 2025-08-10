@@ -120,9 +120,33 @@ void allocateEnergyField(EnergyField& field, double energy_mev);
  * We model energy loss through computational work
  *
  * @param field: Energy field to dissipate
- * @param rounds: Number of encryption rounds to perform
  */
-void dissipateEnergyField(EnergyField& field, int rounds);
+void dissipateEnergyField(EnergyField& field);
+
+/*
+ * Generate random momentum for a fission fragment
+ * We create realistic momentum vectors for physics simulation
+ *
+ * @param fragment: Fragment to assign momentum
+ */
+void generateRandomMomentum(FissionFragment& fragment);
+
+/*
+ * Create an energy field from kinetic energy
+ * We map kinetic energy to memory and CPU usage
+ *
+ * @param energy_mev: Energy level in MeV to allocate
+ * @return: Initialized energy field structure
+ */
+EnergyField createEnergyField(double energy_mev);
+
+/*
+ * Apply conservation laws to a fission event
+ * We adjust fragment properties to ensure conservation
+ *
+ * @param event: Ternary fission event to normalize
+ */
+void applyConservationLaws(TernaryFissionEvent& event);
 
 /*
  * Calculate field interference between two energy fields
@@ -206,8 +230,11 @@ struct PerformanceMetrics {
     double average_event_processing_time_ms;
     double memory_usage_mb;
     double cpu_utilization_percent;
+    double cpu_time_seconds;
     std::uint64_t total_energy_fields_active;
     std::uint64_t total_memory_pool_allocated;
+    std::uint64_t page_faults;
+    std::uint64_t context_switches;
     std::chrono::steady_clock::time_point measurement_time;
 };
 
@@ -299,10 +326,10 @@ bool validateEnergyField(const EnergyField& field);
  * Calculate total system energy
  * We sum all energy in active fields
  *
- * @param fields: Vector of energy field pointers
- * @return: Total energy in MeV
- */
-double calculateTotalSystemEnergy(const std::vector<EnergyField*>& fields);
+ * @param fields: Vector of energy fields
+* @return: Total energy in MeV
+*/
+double calculateTotalSystemEnergy(const std::vector<EnergyField>& fields);
 
 /*
  * Physics calculation helpers
@@ -380,6 +407,17 @@ double normalRandom(double mean = 0.0, double stddev = 1.0);
  * @return: Random integer following Poisson(lambda)
  */
 int poissonRandom(double lambda);
+
+/*
+ * Estimate total power consumption for a portal event
+ * We extend the event duration proportionally to additional power
+ *
+ * @param power_level_mev: Base power level in MeV
+ * @param duration_seconds: Initial duration in seconds
+ * @param additional_power: Additional power applied in MeV
+ * @return: Projected total power usage in MeV
+ */
+double calculateEstimatedPower(double power_level_mev, int duration_seconds, double additional_power);
 
 } // namespace TernaryFission
 

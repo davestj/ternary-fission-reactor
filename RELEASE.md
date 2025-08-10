@@ -1,0 +1,204 @@
+# Release Notes
+
+The following summary outlines documentation updates and feature changes for each commit.
+
+- 2025-07-30 [19c891d] feat: Initial ternary fission simulation system
+- 2025-07-30 [807cd80] Added gha workflow pipeline
+- 2025-07-30 [e9245fd] Updated project README with stats plugins and build status info
+- 2025-07-30 [4fd41bd] Added license
+- 2025-07-30 [438b190] GHA Cleanup
+- 2025-07-30 [bc24954] GHA Cleanup 1
+- 2025-07-30 [d9ab337] GHA Cleanup 2
+- 2025-07-30 [02b9a61] Reordered build pipeline for branch and release types, pr builds
+- 2025-07-30 [ef7f88d] feat: Enhanced CI/CD pipeline with dev-to-master promotion
+- 2025-07-30 [d468e1c] Fixed typo
+- 2025-07-30 [4243066] Fixed release package permission issue
+- 2025-07-30 [1c88ce8] Version bump for release and url correction
+- 2025-07-30 [6ac78ca] Added new documentation with clear and precise examples to use in varying scenarios.
+- 2025-07-30 [4b8c6c3] Version bump and updated gha pipeline flow.
+- 2025-07-30 [646df0e] Updated gha pipeline flow data struct, added NEXT-STEPS and updated current STATUS for README, roleover version incremental for beta to gold added.
+- 2025-07-30 [a59a3a9] Cleanup
+- 2025-07-30 [92296af] cleanup bin and added new docs directory
+- 2025-07-30 [2ad4db6] Added macos build support.
+- 2025-07-30 [ffa6b15] Added ignores
+- 2025-07-30 [e921bad] Added testing doc
+- 2025-07-30 [1abf256] Added prometheus monitor config
+- 2025-07-30 [88497a3] Added docker ignores
+- 2025-07-30 [13d822d] updated docker build system, see testing doc
+- 2025-07-30 [a2e0545] updated docker build system test scripts
+- 2025-07-30 [3f53f00] first test flight for docker-compose, wip
+- 2025-07-30 [260ae04] Fixes and latest updates
+- 2025-07-30 [ce223a2] # Major Dashboard and Configuration Updates
+- 2025-07-30 [2826318] UPDATE: Latest updates, changelog and how to, testing docs pre beta release
+- 2025-07-31 [c1f57df] Added original theor docs from AI prompts I came up with based on original work and external, extra communications from the source.
+- 2025-07-31 [8cd3e3b] New file resources checked in as per previous commit
+- 2025-07-31 [948e844] Updated Makefile for new compile time settings to satisy both macos and linux, added deiban package steps and setup scripts
+- 2025-08-06 [629dee0] latest changes to test/debug with chatgpt agent
+- 2025-08-07 [836103e] Add manual config reload
+- 2025-08-07 [3818b32] Merge pull request #9 from davestj/codex/add-reloadconfiguration-method-for-config
+- 2025-08-07 [123a775] Mark readPIDFromFile as const
+- 2025-08-07 [f159fdb] Add statusToString utility and use in logStatusChange
+- 2025-08-07 [31c66c5] Add debug mode flag and diagnostics
+- 2025-08-07 [b39b53b] Add CPU and memory metrics sampling and tests
+- 2025-08-07 [9cef7ca] Implement energy field update handler
+- 2025-08-07 [9eabdec] Implement simulation control handlers
+- 2025-08-07 [6929fdf] Add macOS file descriptor counting and tests
+- 2025-08-07 [8adc9d1] Merge pull request #10 from davestj/codex/change-readpidfromfile-declaration-to-const
+- 2025-08-07 [fbe0fd9] Merge pull request #12 from davestj/codex/add-debug-mode-to-daemonternaryfissionserver
+- 2025-08-07 [ca83058] Merge pull request #11 from davestj/codex/add-statustostring-function-and-refactor-logging
+- 2025-08-07 [1b90356] Merge pull request #13 from davestj/codex/implement-cpu-and-memory-usage-metrics
+- 2025-08-07 [dd6af28] Merge pull request #14 from davestj/codex/implement-energy-field-update-logic
+- 2025-08-07 [700766e] Merge pull request #15 from davestj/codex/implement-simulation-event-handlers
+- 2025-08-07 [c1db879] Merge branch 'future' into codex/implement-macos-logic-for-file-descriptor-count
+- 2025-08-07 [4cc7c54] Merge pull request #16 from davestj/codex/implement-macos-logic-for-file-descriptor-count
+- 2025-08-07 [8ea7622] Implement physics handlers and add basic unit test
+- 2025-08-07 [090f142] Track energy field states and statistics
+- 2025-08-07 [749ba7f] Merge pull request #17 from davestj/codex/implement-physics-calculations-and-validations
+- 2025-08-07 [c2465cc] Merge pull request #18 from davestj/codex/track-field-states-and-total-energy
+- 2025-08-07 [4a7adbb] Add cpp-httplib dependency
+- 2025-08-07 [8868543] Merge pull request #19 from davestj/codex/add-cpp-httplib-dependency-and-integration
+- 2025-08-07 [8e03a60] Declare start continuous simulation API
+- 2025-08-07 [920dc06] Log requests with cached timestamp
+- 2025-08-07 [1e9bf69] Make system status generation method const
+- 2025-08-07 [9839c46] Return HTTP metrics by const reference
+- 2025-08-07 [aa0f14d] Use new configuration accessors
+- 2025-08-07 [a34f270] Guard SSL features with CPPHTTPLIB_OPENSSL_SUPPORT
+- 2025-08-07 [a31ed59] Merge pull request #20 from davestj/codex/add-continuous-simulation-api-declaration
+- 2025-08-07 [29ee445] Merge pull request #21 from davestj/codex/update-loggingmiddleware-time-expression
+- 2025-08-07 [60b41dc] Merge pull request #22 from davestj/codex/update-generatesystemstatus-method-signature
+- 2025-08-07 [654ff0f] Merge pull request #23 from davestj/codex/update-getmetrics-declaration-and-definition
+- 2025-08-07 [e0ea08c] Merge pull request #24 from davestj/codex/replace-configuration-getter-calls
+- 2025-08-07 [195fe56] Merge branch 'future' into codex/wrap-ssl-features-with-cpphttplib_openssl_support
+- 2025-08-07 [cfdac27] Merge pull request #25 from davestj/codex/wrap-ssl-features-with-cpphttplib_openssl_support
+- 2025-08-07 [9a28134] Add verbose output logging option
+- 2025-08-07 [5bc836b] Merge pull request #26 from davestj/codex/extend-loggingconfiguration-for-verbose-output
+- 2025-08-07 [059d455] Declare simulation engine JSON API methods
+- 2025-08-07 [2f38db8] Merge pull request #27 from davestj/codex/declare-json-api-methods-in-header
+- 2025-08-07 [3c8931f] Expose simulation engine metrics
+- 2025-08-07 [53990f3] Merge pull request #28 from davestj/codex/declare-json-api-methods-in-header
+- 2025-08-07 [4ba7ee3] Declare verifyConservationLaws with tolerances
+- 2025-08-07 [eddd729] Merge pull request #29 from davestj/codex/modify-physics.utilities.h-and-remove-forward-declaration
+- 2025-08-07 [efc12c3] Declare verifyConservationLaws in physics utilities header
+- 2025-08-07 [ba32e75] Merge pull request #30 from davestj/codex/modify-verifyconservationlaws-declaration
+- 2025-08-07 [6cc1687] Make websocket mutex mutable
+- 2025-08-07 [77a5d2f] Merge pull request #31 from davestj/codex/change-websocket_mutex_-to-mutable
+- 2025-08-07 [5c845cc] silence unused parameter warnings in handlers
+- 2025-08-07 [d522bc9] Merge pull request #32 from davestj/codex/apply-maybe_unused-to-unused-parameters
+- 2025-08-07 [54a0858] Broadcast system status to WebSocket queues
+- 2025-08-07 [dd224d0] Merge pull request #33 from davestj/codex/fix-unused-variable-warning-in-broadcastwebsocketupdates
+- 2025-08-07 [bf085d1] Reorder server metrics initialization
+- 2025-08-07 [6f76450] Merge pull request #34 from davestj/codex/adjust-initializer-list-order-for-httpternaryfissionserver
+- 2025-08-07 [a49a4da] docs: add root contributor guidelines
+- 2025-08-07 [be45872] Merge pull request #35 from davestj/codex/add-agents.md-to-repository-root
+- 2025-08-07 [78e5960] chore: add dev build workflow
+- 2025-08-07 [623c0ec] Merge pull request #36 from davestj/codex/create-ci-workflow-with-matrix-build
+- 2025-08-07 [c769d7f] Add daemon server configuration access
+- 2025-08-07 [091a628] Merge pull request #37 from davestj/codex/create-and-implement-daemonternaryfissionserver
+- 2025-08-07 [11e9c56] Merge branch 'future' into dev
+- 2025-08-07 [770fdac] Merge pull request #40 from davestj/dev
+- 2025-08-07 [2cede7b] build: close missing conditionals
+- 2025-08-07 [a577df2] Merge pull request #42 from davestj/codex/fix-makefile-conditional-structure
+- 2025-08-08 [031e63e] config: remove redundant header guard
+- 2025-08-08 [94c3717] Merge pull request #43 from davestj/codex/refactor-config.ternary.fission.server.h
+- 2025-08-08 [e925a0f] scripts: add SSL certificate manager
+- 2025-08-08 [f130fca] configs: update SSL paths
+- 2025-08-08 [205f8c8] config: remove legacy configuration stubs
+- 2025-08-08 [6f22724] Merge pull request #46 from davestj/codex/refactor-configuration-file-code
+- 2025-08-08 [85a8719] Merge pull request #45 from davestj/codex/update-ssl-configuration-for-ternary-fission
+- 2025-08-08 [fa17292] Merge pull request #44 from davestj/codex/create-ssl-manager.sh-script-and-document-usage
+- 2025-08-08 [fb62894] build: remove duplicate main binary rule
+- 2025-08-08 [630dabc] main: integrate configuration manager into daemon startup
+- 2025-08-08 [4e9b582] Merge pull request #47 from davestj/codex/edit-makefile-to-simplify-build-targets
+- 2025-08-08 [9a14f81] Merge pull request #48 from davestj/codex/refactor-daemon_server-initialization-and-methods
+- 2025-08-08 [aa4796c] daemon: remove legacy constructors
+- 2025-08-08 [a35e5dc] daemon: remove stub and add configuration accessor
+- 2025-08-08 [24d726c] daemon: remove stub and add configuration accessor
+- 2025-08-08 [63281d9] Merge pull request #51 from davestj/m4zgkb-codex/refactor-daemon.ternary.fission.server.h
+- 2025-08-08 [d6d66ed] Merge branch 'future' into codex/refactor-daemonternaryfissionserver
+- 2025-08-08 [3d3edbb] Merge pull request #49 from davestj/codex/refactor-daemonternaryfissionserver
+- 2025-08-08 [384ebe9] Merge pull request #50 from davestj/codex/refactor-daemon.ternary.fission.server.h
+- 2025-08-08 [e74bd97] build: initialize build variables before object list
+- 2025-08-09 [508c3a9] Merge pull request #52 from davestj/codex/update-makefile-to-set-build_type-first
+- 2025-08-09 [a905797] build: automate C++ object list
+- 2025-08-09 [b405145] Merge pull request #53 from davestj/codex/update-makefile-for-cpp_objs
+- 2025-08-09 [488c425] build: verify jsoncpp pkg-config path
+- 2025-08-09 [46af5c9] Merge pull request #54 from davestj/codex/verify-jsoncpp-installation-on-macos-and-linux
+- 2025-08-09 [3913f0a] daemon: remove duplicate configuration accessor
+- 2025-08-09 [ff13ed6] Merge pull request #55 from davestj/codex/refactor-configurationmanager-method-declaration
+- 2025-08-09 [4bbce66] build: include jsoncpp development package
+- 2025-08-09 [1a52e6b] Merge pull request #56 from davestj/codex/add-libjsoncpp-dev-to-installation-steps
+- 2025-08-09 [29ee670] makefile: add cpp-build target
+- 2025-08-09 [71b26db] Merge pull request #57 from davestj/codex/add-cpp-build-target-to-makefile
+- 2025-08-09 [a98ea67] physics: modernize EnergyField layout
+- 2025-08-09 [e9e4582] Merge pull request #58 from davestj/codex/update-energyfield-layout-in-physics.constants
+- 2025-08-09 [595f4ff] cpp: cast numeric json values
+- 2025-08-09 [4e2652f] Merge pull request #59 from davestj/codex/change-memory-address-type-casting
+- 2025-08-09 [2239193] server: update energy field JSON
+- 2025-08-09 [8b4be49] Merge pull request #60 from davestj/codex/update-field-names-and-clean-legacy-fields
+- 2025-08-09 [421c16c] physics: replace fetch_add with load-store
+- 2025-08-09 [9a28dd0] Merge pull request #61 from davestj/codex/refactor-json-serialization-time-accumulation
+- 2025-08-09 [1f35996] physics: add event metadata fields
+- 2025-08-09 [07279cf] Merge pull request #62 from davestj/codex/add-fields-to-ternaryfissionevent-struct
+- 2025-08-09 [b2cf86a] physics: replace nuclear fragment struct
+- 2025-08-09 [9eafada] Merge pull request #63 from davestj/codex/refactor-nuclear-fragments-to-fissionfragment
+- 2025-08-09 [755de09] physics: drop legacy energy field flags
+- 2025-08-09 [5e2c14d] Merge pull request #64 from davestj/4mvpev-codex/update-energyfield-layout-in-physics.constants
+- 2025-08-09 [9d830a1] physics: cast memory address to Json::UInt64
+- 2025-08-09 [2eb8b07] Merge pull request #65 from davestj/codex/update-memory-address-assignment-type
+- 2025-08-09 [1f672ba] server: expose new energy field metrics.
+- 2025-08-09 [db1bdd3] Merge pull request #66 from davestj/codex/update-server-field-names-and-cleanup
+- 2025-08-09 [492c9c2] physics: avoid atomic fetch_add
+- 2025-08-09 [4d49895] Merge pull request #67 from davestj/codex/refactor-json_serialization_time_total_-usage
+- 2025-08-09 [7251cd3] server: track conservation metrics
+- 2025-08-09 [24d200a] Merge pull request #68 from davestj/codex/add-fields-to-ternaryfissionevent
+- 2025-08-09 [381a52f] physics: add memory utility prototypes
+- 2025-08-09 [186c407] Merge pull request #69 from davestj/codex/add-memory-pattern-encryption-prototypes
+- 2025-08-09 [cbfab68] physics: expand performance metrics
+- 2025-08-09 [ec791df] Merge pull request #70 from davestj/codex/add-new-members-to-performancemetrics
+- 2025-08-09 [ca6df48] engine: reorder initializer list
+- 2025-08-09 [936a6c3] Merge pull request #71 from davestj/codex/reorder-initializer-list-in-ternary.fission
+- 2025-08-09 [8cf7bc5] simulation: handle energy fields by value
+- 2025-08-09 [5713b64] Merge pull request #72 from davestj/codex/update-energy-field-serialization-in-cpp-file
+- 2025-08-09 [9d6a6cd] physics: declare momentum and conservation prototypes
+- 2025-08-09 [9fa455e] Merge pull request #73 from davestj/codex/add-function-prototypes-in-physics.utilities.h
+- 2025-08-09 [cb6b315] simulation: add energy field dissipation helper
+- 2025-08-09 [90da7e6] Merge pull request #74 from davestj/codex/implement-energy-field-dissipation-logic
+- 2025-08-09 [f41db1b] engine: silence unused parameters.
+- 2025-08-09 [877057c] Merge pull request #75 from davestj/codex/add-void-casts-and-update-logging
+- 2025-08-09 [d0f4497] build: compile main with object flags
+- 2025-08-09 [5b1567d] Merge pull request #76 from davestj/codex/update-makefile-for-ternary-fission-reactor
+- 2025-08-09 [135df20] physics: return EnergyField by value
+- 2025-08-09 [458350f] Merge pull request #77 from davestj/codex/refactor-createenergyfield-function-and-usage
+- 2025-08-09 [01c39cc] simulation: add energy field wrapper
+- 2025-08-09 [0d24844] Merge pull request #78 from davestj/codex/add-createenergyfield-function
+- 2025-08-09 [4c581c8] physics: accept field values in total energy calc
+- 2025-08-09 [e933e92] Merge pull request #79 from davestj/codex/update-calculatetotalsystemenergy-function
+- 2025-08-09 [0f50f20] build: stub missing functions for build
+- 2025-08-09 [45e7e40] Merge pull request #80 from davestj/codex/verify-build-and-run-tests
+- 2025-08-09 [74e589a] config: add web root directory
+- 2025-08-09 [da0b064] Merge pull request #81 from davestj/codex/extend-networkconfiguration-with-web_root
+- 2025-08-09 [b833915] http: mount web root and block traversal
+- 2025-08-09 [461f878] Merge pull request #82 from davestj/codex/initialize-server-and-configure-file-mappings
+- 2025-08-09 [3271a27] media: add streaming controls
+- 2025-08-09 [729bd91] Merge pull request #83 from davestj/codex/add-media-streaming-functionality
+- 2025-08-09 [993318a] configs: add web and media root examples
+- 2025-08-09 [fd0901c] Merge pull request #84 from davestj/codex/update-daemon-config-and-documents
+- 2025-08-09 [c9c25bd] configs: add web and media root examples
+- 2025-08-09 [5a5ea96] Merge pull request #85 from davestj/bymf1b-codex/update-daemon-config-and-documents
+- 2025-08-09 [346008f] cli: implement application entry point
+- 2025-08-09 [d5e0e60] Merge pull request #86 from davestj/codex/implement-cli-and-help-options
+- 2025-08-09 [a908dfc] api: proxy energy field requests to reactor
+- 2025-08-09 [27140f1] Merge pull request #87 from davestj/codex/add-reactorbaseurl-and-refactor-energyfields
+- 2025-08-09 [222874f] go: add energy field dissipation handler
+- 2025-08-09 [ae622d7] Merge pull request #88 from davestj/codex/implement-dissipateenergyfield-endpoint
+- 2025-08-09 [f140944] config: add reactor base URL option
+- 2025-08-09 [10d5dc5] Merge pull request #89 from davestj/codex/extend-config-with-reactorbaseurl
+- 2025-08-10 [de7626d] dashboard: add real-time charts
+- 2025-08-10 [4710421] Merge pull request #90 from davestj/codex/introduce-charting-library-in-dashboard
+- 2025-08-10 [8c74a8a] monitoring: poll reactor status metrics
+- 2025-08-10 [bc7317b] Merge pull request #91 from davestj/codex/add-prometheus-metrics-for-reactor
+- 2025-08-10 [00b0398] go: add integration tests and go-test target
+- 2025-08-10 [f25de2d] Merge pull request #92 from davestj/codex/add-integration-tests-for-api-endpoints
+- 2025-08-10 [202a6a1] docs: expand README with build and run instructions
+- 2025-08-10 [cf05fa7] Merge pull request #93 from davestj/codex/update-readme.md-with-documentation-sections
+- 2025-08-10 [rc1docs] docs: document 2.0.0-rc1 release candidate and cross-link milestone docs

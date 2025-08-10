@@ -36,6 +36,8 @@
 #include <iomanip>
 #include <random>
 #include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <cstring>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -143,13 +145,15 @@ Json::Value SystemStatusResponse::toJson() const {
     json["uptime_seconds"] = static_cast<Json::Int64>(uptime_seconds);
     json["total_fission_events"] = static_cast<Json::UInt64>(total_fission_events);
     json["total_energy_simulated_mev"] = total_energy_simulated_mev;
-    json["active_energy_fields"] = active_energy_fields;
+    json["active_energy_fields"] = static_cast<Json::Int64>(active_energy_fields);
     json["peak_memory_usage_bytes"] = static_cast<Json::UInt64>(peak_memory_usage_bytes);
     json["average_calculation_time_microseconds"] = average_calc_time_microseconds;
     json["total_calculations"] = static_cast<Json::UInt64>(total_calculations);
     json["simulation_running"] = simulation_running;
     json["cpu_usage_percent"] = cpu_usage_percent;
     json["memory_usage_percent"] = memory_usage_percent;
+    json["estimated_power_mev"] = estimated_power_mev;
+    json["portal_duration_remaining_seconds"] = portal_duration_remaining_seconds;
     
     // We add timestamp for response correlation
     auto now = std::chrono::system_clock::now();
@@ -279,6 +283,12 @@ bool HTTPTernaryFissionServer::initialize() {
     bind_ip_ = network_config.bind_ip;
     bind_port_ = network_config.bind_port;
     ssl_enabled_ = network_config.enable_ssl;
+
+    // We setup media streaming manager if enabled
+    auto media_config = config_manager_->getMediaStreamingConfig();
+    if (media_config.media_streaming_enabled) {
+        media_streaming_manager_ = std::make_unique<MediaStreamingManager>(media_config.media_root, media_config.icecast_mount);
+    }
     
     std::cout << "HTTP server configured for " << bind_ip_ << ":" << bind_port_ 
               << (ssl_enabled_ ? " (HTTPS)" : " (HTTP)") << std::endl;
@@ -303,7 +313,40 @@ bool HTTPTernaryFissionServer::initialize() {
     if (!ssl_enabled_) {
         http_server_ = std::make_unique<httplib::Server>();
     }
-    
+
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+    auto server = ssl_enabled_ ?
+        static_cast<httplib::Server*>(https_server_.get()) :
+        static_cast<httplib::Server*>(http_server_.get());
+#else
+    auto server = static_cast<httplib::Server*>(http_server_.get());
+#endif
+
+    if (server) {
+        server->set_mount_point("/", network_config.web_root);
+        server->set_file_extension_and_mimetype_mapping("html", "text/html");
+        server->set_file_extension_and_mimetype_mapping("css", "text/css");
+        server->set_file_extension_and_mimetype_mapping("js", "application/javascript");
+        server->set_file_extension_and_mimetype_mapping("json", "application/json");
+        server->set_file_extension_and_mimetype_mapping("mp3", "audio/mpeg");
+        server->set_file_extension_and_mimetype_mapping("ogg", "audio/ogg");
+        server->set_file_extension_and_mimetype_mapping("oga", "audio/ogg");
+        server->set_file_extension_and_mimetype_mapping("aac", "audio/aac");
+        server->set_file_extension_and_mimetype_mapping("flac", "audio/flac");
+        server->set_file_extension_and_mimetype_mapping("opus", "audio/opus");
+        server->set_file_extension_and_mimetype_mapping("mp4", "video/mp4");
+        server->set_file_extension_and_mimetype_mapping("ogv", "video/ogg");
+        server->set_file_extension_and_mimetype_mapping("webm", "video/webm");
+        server->set_file_extension_and_mimetype_mapping("weba", "audio/webm");
+        server->set_file_extension_and_mimetype_mapping("m3u", "audio/x-mpegurl");
+        server->set_file_extension_and_mimetype_mapping("pls", "audio/x-scpls");
+        server->set_file_extension_and_mimetype_mapping("png", "image/png");
+        server->set_file_extension_and_mimetype_mapping("jpg", "image/jpeg");
+        server->set_file_extension_and_mimetype_mapping("jpeg", "image/jpeg");
+        server->set_file_extension_and_mimetype_mapping("gif", "image/gif");
+        server->set_file_extension_and_mimetype_mapping("svg", "image/svg+xml");
+    }
+
     // We setup middleware and endpoints
     setupMiddleware();
     setupAPIEndpoints();
@@ -389,9 +432,14 @@ void HTTPTernaryFissionServer::stop() {
     
     // We cleanup WebSocket connections
     cleanupWebSocketConnections();
-    
+
     // We shutdown physics engine integration
     shutdownPhysicsEngine();
+
+    // We stop media streaming if active
+    if (media_streaming_manager_) {
+        media_streaming_manager_->stopStreaming();
+    }
     
     std::cout << "HTTP server stopped successfully" << std::endl;
 }
@@ -454,6 +502,10 @@ void HTTPTernaryFissionServer::setupMiddleware() {
     
     // We setup pre-routing middleware
     server->set_pre_routing_handler([this](const httplib::Request& req, httplib::Response& res) {
+        if (req.path.find("..") != std::string::npos) {
+            res.status = 403;
+            return httplib::Server::HandlerResponse::Handled;
+        }
         this->corsMiddleware(req, res);
         this->loggingMiddleware(req, res);
         this->metricsMiddleware(req, res);
@@ -584,7 +636,20 @@ void HTTPTernaryFissionServer::setupAPIEndpoints() {
     server->Post("/api/v1/simulation/reset", [this](const httplib::Request& req, httplib::Response& res) {
         this->handleSimulationReset(req, res);
     });
-    
+
+    server->Put("/api/v1/portal/trigger", [this](const httplib::Request& req, httplib::Response& res) {
+        this->handlePortalTrigger(req, res);
+    });
+
+    // We setup media streaming control endpoints
+    server->Post("/api/v1/stream/start", [this](const httplib::Request& req, httplib::Response& res) {
+        this->handleStreamStart(req, res);
+    });
+
+    server->Post("/api/v1/stream/stop", [this](const httplib::Request& req, httplib::Response& res) {
+        this->handleStreamStop(req, res);
+    });
+
     // We setup physics calculation endpoints
     server->Post("/api/v1/physics/fission", [this](const httplib::Request& req, httplib::Response& res) {
         this->handleFissionCalculation(req, res);
@@ -623,9 +688,9 @@ void HTTPTernaryFissionServer::handleHealthCheck(const httplib::Request& /*req*/
     Json::Value health;
     health["status"] = "healthy";
     health["uptime_seconds"] = static_cast<Json::Int64>(uptime.count());
-    health["active_energy_fields"] = static_cast<int>(energy_fields_.size());
+    health["active_energy_fields"] = static_cast<Json::Int64>(energy_fields_.size());
     health["simulation_running"] = simulation_engine_ != nullptr;
-    health["version"] = "1.1.13";
+    health["version"] = VERSION;
     health["author"] = "bthlops (David StJ)";
     
     auto now = std::chrono::system_clock::now();
@@ -666,7 +731,7 @@ void HTTPTernaryFissionServer::handleEnergyFieldsList(const httplib::Request& /*
     
     Json::Value response;
     response["energy_fields"] = fields_array;
-    response["total_fields"] = static_cast<int>(energy_fields_.size());
+    response["total_fields"] = static_cast<Json::Int64>(energy_fields_.size());
     
     sendJSONResponse(res, 200, response);
     metrics_->incrementSuccessful();
@@ -741,6 +806,8 @@ SystemStatusResponse HTTPTernaryFissionServer::generateSystemStatus() const {
         // status.total_energy_simulated_mev = simulation_engine_->getTotalEnergySimulated();
         // status.total_calculations = simulation_engine_->getTotalCalculations();
         // status.average_calc_time_microseconds = simulation_engine_->getAverageCalculationTime();
+        simulation_engine_->getPortalEventState(status.estimated_power_mev,
+                                               status.portal_duration_remaining_seconds);
     }
     
     // We calculate system resource usage
@@ -773,7 +840,7 @@ void HTTPTernaryFissionServer::sendJSONResponse(httplib::Response& res, int stat
 void HTTPTernaryFissionServer::sendErrorResponse(httplib::Response& res, int status_code, const std::string& message) {
     Json::Value error;
     error["error"] = message;
-    error["status_code"] = status_code;
+    error["status_code"] = static_cast<Json::Int64>(status_code);
     
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
@@ -1237,6 +1304,90 @@ void HTTPTernaryFissionServer::handleSimulationReset(const httplib::Request& /*r
     }
 }
 
+/**
+ * We handle portal trigger endpoint requests
+ * This method schedules a timed energy load through the simulation engine
+ */
+void HTTPTernaryFissionServer::handlePortalTrigger(const httplib::Request& req, httplib::Response& res) {
+    Json::Value body;
+    if (!parseJSONRequest(req, body)) {
+        sendErrorResponse(res, 400, "Invalid JSON request body");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    double duration = body.get("duration_seconds", 900.0).asDouble();
+    if (duration <= 0.0) {
+        duration = 900.0;
+    }
+    double power = body.get("power_level_mev", 0.0).asDouble();
+    double extra = body.get("additional_power_mev", 0.0).asDouble();
+
+    double estimated = calculateEstimatedPower(power, static_cast<int>(duration), extra);
+    double extension = 1.0;
+    if (power > 0.0 && extra > 0.0) {
+        extension += extra / power;
+    }
+    double adjusted_duration = duration * extension;
+    double total_power = power + extra;
+
+    {
+        std::lock_guard<std::mutex> lock(simulation_mutex_);
+        if (!simulation_engine_) {
+            sendErrorResponse(res, 500, "Simulation engine not initialized");
+            metrics_->incrementErrors();
+            return;
+        }
+        simulation_engine_->startPortalLoad(adjusted_duration, total_power);
+        auto start = std::chrono::system_clock::now();
+        auto end = start + std::chrono::seconds(static_cast<int>(adjusted_duration));
+        simulation_engine_->setPortalEventState(start, end, estimated);
+    }
+
+    Json::Value ack;
+    ack["scheduled_duration_seconds"] = adjusted_duration;
+    ack["projected_power_level_mev"] = total_power;
+
+    sendJSONResponse(res, 200, ack);
+    metrics_->incrementSuccessful();
+}
+
+void HTTPTernaryFissionServer::handleStreamStart(const httplib::Request& /*req*/, httplib::Response& res) {
+    if (!media_streaming_manager_) {
+        sendErrorResponse(res, 400, "Media streaming not enabled");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    if (media_streaming_manager_->startStreaming()) {
+        Json::Value response;
+        response["status"] = "started";
+        sendJSONResponse(res, 200, response);
+        metrics_->incrementSuccessful();
+    } else {
+        sendErrorResponse(res, 500, "Failed to start media streaming");
+        metrics_->incrementErrors();
+    }
+}
+
+void HTTPTernaryFissionServer::handleStreamStop(const httplib::Request& /*req*/, httplib::Response& res) {
+    if (!media_streaming_manager_) {
+        sendErrorResponse(res, 400, "Media streaming not enabled");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    if (media_streaming_manager_->stopStreaming()) {
+        Json::Value response;
+        response["status"] = "stopped";
+        sendJSONResponse(res, 200, response);
+        metrics_->incrementSuccessful();
+    } else {
+        sendErrorResponse(res, 500, "Failed to stop media streaming");
+        metrics_->incrementErrors();
+    }
+}
+
 void HTTPTernaryFissionServer::handleFissionCalculation(const httplib::Request& req, httplib::Response& res) {
     Json::Value body;
     if (!parseJSONRequest(req, body)) {
@@ -1273,13 +1424,25 @@ void HTTPTernaryFissionServer::handleFissionCalculation(const httplib::Request& 
         response["q_value"] = event.q_value;
         response["total_kinetic_energy"] = event.total_kinetic_energy;
 
-        auto serializeFragment = [](const NuclearFragment& frag) {
+        auto serializeFragment = [](const FissionFragment& frag) {
             Json::Value jf;
             jf["mass"] = frag.mass;
+            jf["atomic_number"] = static_cast<Json::Int64>(frag.atomic_number);
+            jf["mass_number"] = static_cast<Json::Int64>(frag.mass_number);
             jf["kinetic_energy"] = frag.kinetic_energy;
-            jf["momentum_x"] = frag.momentum_x;
-            jf["momentum_y"] = frag.momentum_y;
-            jf["momentum_z"] = frag.momentum_z;
+            jf["binding_energy"] = frag.binding_energy;
+            jf["excitation_energy"] = frag.excitation_energy;
+            jf["half_life"] = frag.half_life;
+            Json::Value momentum;
+            momentum["x"] = frag.momentum.x;
+            momentum["y"] = frag.momentum.y;
+            momentum["z"] = frag.momentum.z;
+            jf["momentum"] = momentum;
+            Json::Value position;
+            position["x"] = frag.position.x;
+            position["y"] = frag.position.y;
+            position["z"] = frag.position.z;
+            jf["position"] = position;
             return jf;
         };
 
@@ -1304,24 +1467,59 @@ void HTTPTernaryFissionServer::handleConservationLaws(const httplib::Request& re
 
     try {
         TernaryFissionEvent event;
+        event.event_id = body.get("event_id", 0).asUInt64();
+        event.energy_field_id = body.get("energy_field_id", 0).asUInt64();
         event.q_value = body.get("q_value", 0.0).asDouble();
 
-        auto parseFragment = [](const Json::Value& jf, NuclearFragment& frag) {
-            frag.kinetic_energy = jf.get("kinetic_energy", 0.0).asDouble();
-            frag.momentum_x = jf.get("momentum_x", 0.0).asDouble();
-            frag.momentum_y = jf.get("momentum_y", 0.0).asDouble();
-            frag.momentum_z = jf.get("momentum_z", 0.0).asDouble();
+        auto parseFragment = [](const Json::Value& jf, FissionFragment& frag) {
             frag.mass = jf.get("mass", 0.0).asDouble();
+            frag.atomic_number = jf.get("atomic_number", 0).asInt();
+            frag.mass_number = jf.get("mass_number", 0).asInt();
+            frag.kinetic_energy = jf.get("kinetic_energy", 0.0).asDouble();
+            frag.binding_energy = jf.get("binding_energy", 0.0).asDouble();
+            frag.excitation_energy = jf.get("excitation_energy", 0.0).asDouble();
+            frag.half_life = jf.get("half_life", 0.0).asDouble();
+            const Json::Value& momentum = jf["momentum"];
+            frag.momentum.x = momentum.get("x", 0.0).asDouble();
+            frag.momentum.y = momentum.get("y", 0.0).asDouble();
+            frag.momentum.z = momentum.get("z", 0.0).asDouble();
+            const Json::Value& position = jf["position"];
+            frag.position.x = position.get("x", 0.0).asDouble();
+            frag.position.y = position.get("y", 0.0).asDouble();
+            frag.position.z = position.get("z", 0.0).asDouble();
         };
 
         parseFragment(body["heavy_fragment"], event.heavy_fragment);
         parseFragment(body["light_fragment"], event.light_fragment);
         parseFragment(body["alpha_particle"], event.alpha_particle);
 
-        bool ok = verifyConservationLaws(event, 1e-3, 1e-6);
+        event.total_kinetic_energy = event.heavy_fragment.kinetic_energy +
+                                    event.light_fragment.kinetic_energy +
+                                    event.alpha_particle.kinetic_energy;
+        event.binding_energy_released = event.q_value - event.total_kinetic_energy;
+
+        // Calculate conservation errors
+        double total_px = event.heavy_fragment.momentum.x + event.light_fragment.momentum.x +
+                          event.alpha_particle.momentum.x;
+        double total_py = event.heavy_fragment.momentum.y + event.light_fragment.momentum.y +
+                          event.alpha_particle.momentum.y;
+        double total_pz = event.heavy_fragment.momentum.z + event.light_fragment.momentum.z +
+                          event.alpha_particle.momentum.z;
+
+        event.momentum_conservation_error =
+            std::sqrt(total_px * total_px + total_py * total_py + total_pz * total_pz);
+        event.momentum_conserved = event.momentum_conservation_error < 1e-6;
+
+        event.energy_conservation_error =
+            std::abs(event.q_value - event.total_kinetic_energy);
+        event.energy_conserved = event.energy_conservation_error < 1e-3;
+
+        bool ok = event.energy_conserved && event.momentum_conserved;
 
         Json::Value response;
         response["conserved"] = ok;
+        response["energy_conservation_error"] = event.energy_conservation_error;
+        response["momentum_conservation_error"] = event.momentum_conservation_error;
         sendJSONResponse(res, 200, response);
     } catch (const std::exception& e) {
         sendErrorResponse(res, 400, std::string("Invalid event data: ") + e.what());
@@ -1359,12 +1557,18 @@ void HTTPTernaryFissionServer::handleEnergyGeneration(const httplib::Request& re
         }
 
         Json::Value jf;
-        jf["initial_energy_mev"] = field.initial_energy_level;
-        jf["current_energy_mev"] = field.current_energy_level;
-        jf["memory_allocated_bytes"] = static_cast<Json::UInt64>(field.memory_allocated);
-        jf["cpu_cycles_consumed"] = static_cast<Json::UInt64>(field.cpu_cycles_consumed);
+        jf["field_id"] = static_cast<Json::UInt64>(field.field_id);
+        jf["energy_mev"] = field.energy_mev;
+        jf["memory_bytes"] = static_cast<Json::UInt64>(field.memory_bytes);
+        jf["cpu_cycles"] = static_cast<Json::UInt64>(field.cpu_cycles);
         jf["entropy_factor"] = field.entropy_factor;
-        jf["energy_dissipated"] = field.energy_dissipated;
+        jf["dissipation_rate"] = field.dissipation_rate;
+        jf["stability_factor"] = field.stability_factor;
+        jf["interaction_strength"] = field.interaction_strength;
+
+        auto time_since_epoch = field.creation_time.time_since_epoch();
+        auto timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count();
+        jf["creation_time_ms"] = static_cast<Json::Int64>(timestamp_ms);
 
         sendJSONResponse(res, 200, jf);
     } catch (const std::exception& e) {
@@ -1401,9 +1605,9 @@ Json::Value HTTPTernaryFissionServer::computeFieldStatistics() const {
     int inactive_fields = total_fields - active_fields;
     double average_energy = total_fields > 0 ? total_energy / total_fields : 0.0;
 
-    stats["total_fields"] = total_fields;
-    stats["active_fields"] = active_fields;
-    stats["inactive_fields"] = inactive_fields;
+    stats["total_fields"] = static_cast<Json::Int64>(total_fields);
+    stats["active_fields"] = static_cast<Json::Int64>(active_fields);
+    stats["inactive_fields"] = static_cast<Json::Int64>(inactive_fields);
     stats["total_energy_mev"] = total_energy;
     stats["average_energy_mev"] = average_energy;
     stats["peak_energy_mev"] = peak_energy;

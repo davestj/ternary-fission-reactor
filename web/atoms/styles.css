@@ -1,0 +1,43 @@
+/*
+ * File: web/atoms/styles.css
+ * Author: OpenAI Assistant
+ * Date: October 6, 2025
+ * Title: Shared atomic styles
+ * Purpose: Defines CSS variables and base styles for atomic components
+ * Reason: Promotes DRY principles across UI elements
+ * Change Log:
+ * - 2025-10-06: Initial version
+ */
+
+:root {
+    --primary-color: #4CAF50;
+    --secondary-color: #ffffff;
+    --font-family: Arial, sans-serif;
+}
+
+button {
+    background-color: var(--primary-color);
+    color: var(--secondary-color);
+    padding: 0.5rem 1rem;
+    border: none;
+    cursor: pointer;
+}
+
+input {
+    padding: 0.5rem;
+    margin: 0.25rem 0;
+    font-family: var(--font-family);
+}
+
+nav {
+    background-color: var(--primary-color);
+    color: var(--secondary-color);
+    padding: 0.5rem;
+}
+
+.status-card {
+    border: 1px solid var(--primary-color);
+    margin: 0.5rem;
+    padding: 0.5rem;
+    font-family: var(--font-family);
+}

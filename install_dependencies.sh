@@ -3,13 +3,14 @@
 # Author: David St. John (davestj@gmail.com)
 # Date: 2025-07-31
 # Purpose: Install build dependencies for Ternary Fission Reactor project
-# Version: 1.1.13
+# Version: 2.0.0-rc1
 #
 # Change Log:
 # - 2025-07-31: Initial cross-platform dependency installation script
 # - 2025-07-31: Added jsoncpp and OpenSSL installation for both platforms
 # - 2025-07-31: Added development tools installation (cppcheck, clang-tidy)
 # - 2025-07-31: Added package verification and error handling
+# - 2025-07-31: Added jsoncpp pkg-config detection and PKG_CONFIG_PATH export
 #
 # Usage:
 # ./install_dependencies.sh
@@ -65,6 +66,32 @@ detect_platform() {
 # Check if command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
+}
+
+# Ensure jsoncpp pkg-config file is discoverable
+ensure_jsoncpp_pkgconfig() {
+    if pkg-config --exists jsoncpp; then
+        log_info "\u2713 jsoncpp found via pkg-config"
+        return
+    fi
+
+    log_warn "jsoncpp.pc not found in PKG_CONFIG_PATH, attempting to locate..."
+    local pc_file
+    if [[ "$PLATFORM" == "macos" ]]; then
+        local brew_prefix=$(brew --prefix jsoncpp 2>/dev/null || brew --prefix)
+        pc_file=$(find "$brew_prefix" -path "*/pkgconfig/jsoncpp.pc" 2>/dev/null | head -n 1)
+    else
+        pc_file=$(find /usr /usr/local -path "*/pkgconfig/jsoncpp.pc" 2>/dev/null | head -n 1)
+    fi
+
+    if [ -n "$pc_file" ]; then
+        local pc_dir="$(dirname "$pc_file")"
+        export PKG_CONFIG_PATH="$pc_dir:${PKG_CONFIG_PATH:-}"
+        log_info "Added $pc_dir to PKG_CONFIG_PATH"
+    else
+        log_error "jsoncpp.pc could not be located"
+        exit 1
+    fi
 }
 
 # Install macOS dependencies
@@ -361,7 +388,9 @@ main() {
             exit 1
             ;;
     esac
-    
+
+    ensure_jsoncpp_pkgconfig
+
     # Test compilation
     test_compilation
     

@@ -49,7 +49,7 @@
 #include <mutex>
 #include <atomic>
 #include <chrono>
-#include <memory>
+#include <cstdlib>
 
 // OpenSSL includes for encryption and hashing
 #include <openssl/evp.h>
@@ -64,8 +64,12 @@
 
 namespace TernaryFission {
 
-// Global thread-local storage for random number generators
-thread_local std::mt19937_64 tl_rng(std::random_device{}());
+    // Forward declarations for internal utility functions
+    void encryptMemoryPattern(void* memory_ptr, size_t memory_size, uint64_t field_id);
+    void applyEntropyToMemory(void* memory_ptr, size_t memory_size, double entropy_factor);
+
+    // Global thread-local storage for random number generators
+    thread_local std::mt19937_64 tl_rng(std::random_device{}());
 
 // Global configuration
 EnergyFieldConfig g_energy_field_config;
@@ -80,6 +84,13 @@ static std::mutex daemon_logging_mutex_;
 static std::ofstream daemon_log_file_;
 static std::atomic<bool> daemon_logging_enabled_{false};
 static std::string daemon_log_file_path_;
+
+// We generate unique field identifiers
+static std::atomic<std::uint64_t> field_id_counter_{1};
+
+std::uint64_t generateFieldId() {
+    return field_id_counter_.fetch_add(1, std::memory_order_relaxed);
+}
 
 /*
  * HTTP API: Convert energy field to JSON representation
@@ -104,11 +115,9 @@ std::string energyFieldToJSON(const EnergyField& field) {
     auto timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count();
     json_field["creation_time_ms"] = static_cast<Json::Int64>(timestamp_ms);
 
-    // Memory allocation status
-    json_field["memory_allocated"] = (field.memory_ptr != nullptr && field.memory_bytes > 0);
-
+    // Memory mapping details
     if (field.memory_ptr && field.memory_bytes > 0) {
-        json_field["memory_address"] = reinterpret_cast<uintptr_t>(field.memory_ptr);
+        json_field["memory_address"] = static_cast<Json::UInt64>(reinterpret_cast<uintptr_t>(field.memory_ptr));
 
         // Calculate memory entropy for monitoring
         double memory_entropy = calculateEntropy(field.memory_bytes, field.cpu_cycles);
@@ -129,7 +138,9 @@ std::string energyFieldToJSON(const EnergyField& field) {
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
 
     json_operations_counter_.fetch_add(1, std::memory_order_relaxed);
-    json_serialization_time_total_.fetch_add(duration.count() / 1e6, std::memory_order_relaxed);
+    double value = duration.count() / 1e6;
+    double current = json_serialization_time_total_.load(std::memory_order_relaxed);
+    json_serialization_time_total_.store(current + value, std::memory_order_relaxed);
 
     return json_string;
 }
@@ -155,8 +166,8 @@ std::string fissionEventToJSON(const TernaryFissionEvent& event) {
     auto serializeFragment = [](const FissionFragment& fragment) -> Json::Value {
         Json::Value json_fragment;
         json_fragment["mass"] = fragment.mass;
-        json_fragment["atomic_number"] = fragment.atomic_number;
-        json_fragment["mass_number"] = fragment.mass_number;
+        json_fragment["atomic_number"] = static_cast<Json::Int64>(fragment.atomic_number);
+        json_fragment["mass_number"] = static_cast<Json::Int64>(fragment.mass_number);
         json_fragment["kinetic_energy"] = fragment.kinetic_energy;
         json_fragment["binding_energy"] = fragment.binding_energy;
         json_fragment["excitation_energy"] = fragment.excitation_energy;
@@ -211,7 +222,9 @@ std::string fissionEventToJSON(const TernaryFissionEvent& event) {
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
 
     json_operations_counter_.fetch_add(1, std::memory_order_relaxed);
-    json_serialization_time_total_.fetch_add(duration.count() / 1e6, std::memory_order_relaxed);
+    double value = duration.count() / 1e6;
+    double current = json_serialization_time_total_.load(std::memory_order_relaxed);
+    json_serialization_time_total_.store(current + value, std::memory_order_relaxed);
 
     return json_string;
 }
@@ -227,7 +240,7 @@ std::string formatHTTPResponse(const std::string& status, const std::string& mes
     Json::Value response;
     response["status"] = status;
     response["message"] = message;
-    response["http_status"] = http_status_code;
+    response["http_status"] = static_cast<Json::Int64>(http_status_code);
 
     if (!data.isNull() && !data.empty()) {
         response["data"] = data;
@@ -240,7 +253,7 @@ std::string formatHTTPResponse(const std::string& status, const std::string& mes
     timestamp_ss << std::put_time(std::gmtime(&time_t), "%Y-%m-%dT%H:%M:%SZ");
     response["timestamp"] = timestamp_ss.str();
 
-    response["api_version"] = "1.1.13";
+    response["api_version"] = VERSION;
     response["server"] = "ternary-fission-daemon";
 
     Json::StreamWriterBuilder builder;
@@ -449,40 +462,40 @@ void generateRandomMomentum(FissionFragment& fragment) {
  * Create an energy field from kinetic energy
  * We map kinetic energy to memory and CPU usage
  */
-std::shared_ptr<EnergyField> createEnergyField(double energy_mev) {
-    auto field = std::make_shared<EnergyField>();
+EnergyField createEnergyField(double energy_mev) {
+    EnergyField field{};
 
     // Generate unique field ID
     static std::atomic<uint64_t> field_id_counter{1};
-    field->field_id = field_id_counter.fetch_add(1, std::memory_order_relaxed);
+    field.field_id = field_id_counter.fetch_add(1, std::memory_order_relaxed);
 
-    field->energy_mev = energy_mev;
-    field->creation_time = std::chrono::high_resolution_clock::now();
+    field.energy_mev = energy_mev;
+    field.creation_time = std::chrono::high_resolution_clock::now();
 
     // Map energy to memory and CPU
-    field->memory_bytes = static_cast<size_t>(energy_mev * g_energy_field_config.memory_per_mev);
-    field->cpu_cycles = static_cast<uint64_t>(energy_mev * g_energy_field_config.cpu_cycles_per_mev);
+    field.memory_bytes = static_cast<size_t>(energy_mev * g_energy_field_config.memory_per_mev);
+    field.cpu_cycles = static_cast<uint64_t>(energy_mev * g_energy_field_config.cpu_cycles_per_mev);
 
     // Calculate entropy
-    field->entropy_factor = calculateEntropy(field->memory_bytes, field->cpu_cycles);
+    field.entropy_factor = calculateEntropy(field.memory_bytes, field.cpu_cycles);
 
     // Set field properties
-    field->dissipation_rate = g_energy_field_config.dissipation_rate_default;
-    field->stability_factor = 1.0 - field->entropy_factor;
-    field->interaction_strength = energy_mev / 1000.0;  // Normalized
+    field.dissipation_rate = g_energy_field_config.dissipation_rate_default;
+    field.stability_factor = 1.0 - field.entropy_factor;
+    field.interaction_strength = energy_mev / 1000.0;  // Normalized
 
     // Allocate memory for energy field
-    if (g_energy_field_config.use_memory_pool && field->memory_bytes > 0) {
+    if (g_energy_field_config.use_memory_pool && field.memory_bytes > 0) {
         try {
-            field->memory_ptr = std::malloc(field->memory_bytes);
-            if (field->memory_ptr) {
+            field.memory_ptr = std::malloc(field.memory_bytes);
+            if (field.memory_ptr) {
                 // Initialize memory with encrypted pattern
-                encryptMemoryPattern(field->memory_ptr, field->memory_bytes, field->field_id);
+                encryptMemoryPattern(field.memory_ptr, field.memory_bytes, field.field_id);
             }
         } catch (const std::exception& e) {
             std::cerr << "Memory allocation failed for energy field: " << e.what() << std::endl;
-            field->memory_ptr = nullptr;
-            field->memory_bytes = 0;
+            field.memory_ptr = nullptr;
+            field.memory_bytes = 0;
         }
     }
 
@@ -660,7 +673,7 @@ void cleanupPhysicsUtilities() {
  * We provide real-time performance monitoring
  */
 PerformanceMetrics getCurrentPerformanceMetrics() {
-    PerformanceMetrics metrics;
+    PerformanceMetrics metrics{};
     metrics.measurement_time = std::chrono::steady_clock::now();
 
     // Get process resource usage
@@ -670,16 +683,21 @@ PerformanceMetrics getCurrentPerformanceMetrics() {
     // Memory usage
     metrics.memory_usage_mb = usage.ru_maxrss / 1024.0;  // Convert KB to MB
 
-    // CPU time
+    // CPU utilization (approximate)
     double cpu_time = usage.ru_utime.tv_sec + usage.ru_utime.tv_usec / 1e6 +
-                     usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1e6;
+                      usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1e6;
+    metrics.cpu_utilization_percent = cpu_time * 100.0;
     metrics.cpu_time_seconds = cpu_time;
 
-    // Page faults
-    metrics.page_faults = usage.ru_majflt + usage.ru_minflt;
-
-    // Context switches
+    // Page faults and context switches
+    metrics.page_faults = usage.ru_minflt + usage.ru_majflt;
     metrics.context_switches = usage.ru_nvcsw + usage.ru_nivcsw;
+
+    // Placeholder metrics not yet collected
+    metrics.events_per_second = 0.0;
+    metrics.average_event_processing_time_ms = 0.0;
+    metrics.total_energy_fields_active = 0;
+    metrics.total_memory_pool_allocated = 0;
 
     return metrics;
 }
@@ -722,12 +740,12 @@ bool validateEnergyField(const EnergyField& field) {
  * Calculate total system energy
  * We sum all energy in active fields
  */
-double calculateTotalSystemEnergy(const std::vector<EnergyField*>& fields) {
+double calculateTotalSystemEnergy(const std::vector<EnergyField>& fields) {
     double total_energy = 0.0;
 
-    for (const auto* field : fields) {
-        if (field && validateEnergyField(*field)) {
-            total_energy += field->energy_mev;
+    for (const auto& field : fields) {
+        if (validateEnergyField(field)) {
+            total_energy += field.energy_mev;
         }
     }
 
@@ -767,6 +785,19 @@ double normalRandom(double mean, double stddev) {
 int poissonRandom(double lambda) {
     std::poisson_distribution<int> dist(lambda);
     return dist(tl_rng);
+}
+
+/*
+ * Calculate projected power usage with duration extension
+ * We increase duration proportionally to additional power
+ */
+double calculateEstimatedPower(double power_level_mev, int duration_seconds, double additional_power) {
+    double duration = static_cast<double>(duration_seconds);
+    if (power_level_mev > 0.0 && additional_power > 0.0) {
+        duration *= 1.0 + (additional_power / power_level_mev);
+    }
+    double total_power = power_level_mev + additional_power;
+    return total_power * duration;
 }
 
 } // namespace TernaryFission

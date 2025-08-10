@@ -7,7 +7,7 @@
 
 ARG BUILD_DATE
 ARG GIT_COMMIT
-ARG VERSION=1.1.13
+ARG VERSION=2.0.0-rc1
 
 FROM debian:12 AS cpp-builder
 
@@ -17,10 +17,11 @@ ARG VERSION
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
-    build-essential gcc g++ cmake make pkg-config \
+    build-essential gcc g++ cmake make pkg-config libjsoncpp-dev \
     libgsl-dev libeigen3-dev libfftw3-dev libopenblas-dev \
     liblapack-dev libssl-dev libcrypto++-dev libboost-all-dev git \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && pkg-config --cflags --libs jsoncpp
 
 WORKDIR /build
 COPY include/ include/

@@ -31,6 +31,7 @@
 #include "config.ternary.fission.server.h"
 #include "physics.constants.definitions.h"
 #include "ternary.fission.simulation.engine.h"
+#include "media.streaming.h"
 #include <httplib.h>
 #include <json/json.h>
 #include <string>
@@ -100,6 +101,8 @@ struct SystemStatusResponse {
     bool simulation_running = false;            // Simulation engine status
     double cpu_usage_percent = 0.0;            // Current CPU usage percentage
     double memory_usage_percent = 0.0;         // Current memory usage percentage
+    double estimated_power_mev = 0.0;          // Estimated portal power usage
+    int portal_duration_remaining_seconds = 0; // Remaining portal duration
     
     // We provide JSON serialization method
     Json::Value toJson() const;
@@ -154,6 +157,9 @@ private:
 #endif
     std::shared_ptr<TernaryFissionSimulationEngine> simulation_engine_; // Physics engine
     std::mutex simulation_mutex_;                // Simulation state synchronization
+
+    // We manage external media streaming process
+    std::unique_ptr<MediaStreamingManager> media_streaming_manager_;
     
     // We maintain server state and configuration
     std::string bind_ip_;                       // Network binding IP address
@@ -197,6 +203,9 @@ private:
     void handleSimulationStart(const httplib::Request& req, httplib::Response& res); // Start simulation
     void handleSimulationStop(const httplib::Request& req, httplib::Response& res); // Stop simulation
     void handleSimulationReset(const httplib::Request& req, httplib::Response& res); // Reset simulation
+    void handlePortalTrigger(const httplib::Request& req, httplib::Response& res); // Trigger portal load
+    void handleStreamStart(const httplib::Request& req, httplib::Response& res); // Start media streaming
+    void handleStreamStop(const httplib::Request& req, httplib::Response& res);  // Stop media streaming
     void handleFissionCalculation(const httplib::Request& req, httplib::Response& res); // Fission calc
     void handleConservationLaws(const httplib::Request& req, httplib::Response& res); // Conservation check
     void handleEnergyGeneration(const httplib::Request& req, httplib::Response& res); // Energy generation

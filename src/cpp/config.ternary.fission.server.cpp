@@ -1,14 +1,3 @@
-
-#include "config.ternary.fission.server.h"
-
-namespace TernaryFission {
-
-Configuration::Configuration() : physics_config_() {}
-
-const EnergyFieldConfig& Configuration::getPhysicsConfig() const {
-    return physics_config_;
-}
-
 /*
  * File: src/cpp/config.ternary.fission.server.cpp
  * Author: bthlops (David StJ)
@@ -66,6 +55,7 @@ ConfigurationManager::ConfigurationManager(const std::string& config_file_path)
     ssl_config_ = SSLConfiguration();
     physics_config_ = PhysicsConfiguration();
     logging_config_ = LoggingConfiguration();
+    media_streaming_config_ = MediaStreamingConfiguration();
     
     // We process environment variable overrides first
     processEnvironmentOverrides();
@@ -155,6 +145,7 @@ bool ConfigurationManager::validateConfiguration() {
     if (!validateSSLConfiguration()) all_valid = false;
     if (!validatePhysicsConfiguration()) all_valid = false;
     if (!validateLoggingConfiguration()) all_valid = false;
+    if (!validateMediaStreamingConfiguration()) all_valid = false;
     
     return all_valid;
 }
@@ -226,6 +217,7 @@ bool ConfigurationManager::parseConfigurationFile() {
     if (!parseSSLConfiguration()) return false;
     if (!parsePhysicsConfiguration()) return false;
     if (!parseLoggingConfiguration()) return false;
+    if (!parseMediaStreamingConfiguration()) return false;
     
     return true;
 }
@@ -245,7 +237,8 @@ bool ConfigurationManager::parseNetworkConfiguration() {
     network_config_.connection_timeout = getConfigInt("connection_timeout", 30);
     network_config_.enable_cors = getConfigBool("enable_cors", true);
     network_config_.request_size_limit = getConfigInt("request_size_limit", 10485760);
-    
+    network_config_.web_root = getConfigValue("web_root", "");
+
     // We parse CORS origins list
     std::string cors_origins_str = getConfigValue("cors_origins", "*");
     if (cors_origins_str != "*") {
@@ -328,7 +321,14 @@ bool ConfigurationManager::parseLoggingConfiguration() {
     logging_config_.enable_json_logging = getConfigBool("enable_json_logging", false);
     logging_config_.verbose_output = getConfigBool("verbose_output", false);
     logging_config_.log_timestamp_format = getConfigValue("log_timestamp_format", "%Y-%m-%d %H:%M:%S");
-    
+
+    return true;
+}
+
+bool ConfigurationManager::parseMediaStreamingConfiguration() {
+    media_streaming_config_.media_streaming_enabled = getConfigBool("media_streaming_enabled", false);
+    media_streaming_config_.media_root = getConfigValue("media_root", "");
+    media_streaming_config_.icecast_mount = getConfigValue("icecast_mount", "");
     return true;
 }
 
@@ -368,7 +368,13 @@ bool ConfigurationManager::validateNetworkConfiguration() {
         addValidationError("Invalid request_size_limit: " + std::to_string(network_config_.request_size_limit));
         valid = false;
     }
-    
+
+    // We validate web root directory
+    if (!ConfigurationUtils::validateDirectoryPath(network_config_.web_root, false)) {
+        addValidationError("Invalid web_root: " + network_config_.web_root);
+        valid = false;
+    }
+
     return valid;
 }
 
@@ -557,7 +563,28 @@ bool ConfigurationManager::validateLoggingConfiguration() {
         addValidationError("Invalid log rotation count: " + std::to_string(logging_config_.log_rotation_count));
         valid = false;
     }
-    
+
+    return valid;
+}
+
+bool ConfigurationManager::validateMediaStreamingConfiguration() {
+    bool valid = true;
+
+    if (media_streaming_config_.media_streaming_enabled) {
+        if (media_streaming_config_.media_root.empty()) {
+            addValidationError("Media streaming enabled but media_root not set");
+            valid = false;
+        } else if (!ConfigurationUtils::validateDirectoryPath(media_streaming_config_.media_root, false)) {
+            addValidationError("Media root directory does not exist: " + media_streaming_config_.media_root);
+            valid = false;
+        }
+
+        if (media_streaming_config_.icecast_mount.empty()) {
+            addValidationError("Media streaming enabled but icecast_mount not set");
+            valid = false;
+        }
+    }
+
     return valid;
 }
 
@@ -603,7 +630,7 @@ void ConfigurationManager::processEnvironmentOverrides() {
     if (!env_events_per_second.empty()) {
         physics_config_.events_per_second = std::stod(env_events_per_second);
     }
-    
+
     // We process logging configuration overrides
     std::string env_log_level = getEnvironmentVariable("TERNARY_LOG_LEVEL");
     if (!env_log_level.empty()) {
@@ -613,6 +640,22 @@ void ConfigurationManager::processEnvironmentOverrides() {
     std::string env_verbose_output = getEnvironmentVariable("TERNARY_VERBOSE_OUTPUT");
     if (!env_verbose_output.empty()) {
         logging_config_.verbose_output = (env_verbose_output == "true" || env_verbose_output == "1");
+    }
+
+    // We process media streaming overrides
+    std::string env_streaming_enabled = getEnvironmentVariable("TERNARY_MEDIA_STREAMING_ENABLED");
+    if (!env_streaming_enabled.empty()) {
+        media_streaming_config_.media_streaming_enabled = (env_streaming_enabled == "true" || env_streaming_enabled == "1");
+    }
+
+    std::string env_media_root = getEnvironmentVariable("TERNARY_MEDIA_ROOT");
+    if (!env_media_root.empty()) {
+        media_streaming_config_.media_root = env_media_root;
+    }
+
+    std::string env_icecast_mount = getEnvironmentVariable("TERNARY_ICECAST_MOUNT");
+    if (!env_icecast_mount.empty()) {
+        media_streaming_config_.icecast_mount = env_icecast_mount;
     }
 }
 
@@ -689,6 +732,11 @@ const PhysicsConfiguration& ConfigurationManager::getPhysicsConfig() const {
 const LoggingConfiguration& ConfigurationManager::getLoggingConfig() const {
     std::lock_guard<std::mutex> lock(config_mutex_);
     return logging_config_;
+}
+
+const MediaStreamingConfiguration& ConfigurationManager::getMediaStreamingConfig() const {
+    std::lock_guard<std::mutex> lock(config_mutex_);
+    return media_streaming_config_;
 }
 
 // We implement utility functions for configuration management
@@ -881,6 +929,37 @@ std::chrono::system_clock::time_point ConfigurationManager::getFileModificationT
         return std::chrono::system_clock::from_time_t(st.st_mtime);
     }
     return std::chrono::system_clock::time_point::min();
+}
+
+std::vector<std::string> ConfigurationManager::getConfigStringList(const std::string& key) const {
+    std::vector<std::string> values;
+    std::string raw = getConfigValue(key, "");
+    if (raw.empty()) {
+        return values;
+    }
+
+    std::stringstream ss(raw);
+    std::string item;
+    while (std::getline(ss, item, ',')) {
+        values.push_back(item);
+    }
+    return values;
+}
+
+bool ConfigurationManager::validateCertificateFile(const std::string& cert_path) {
+    return fileExists(cert_path) && isFileReadable(cert_path);
+}
+
+bool ConfigurationManager::validatePrivateKeyFile(const std::string& key_path) {
+    return fileExists(key_path) && isFileReadable(key_path);
+}
+
+bool ConfigurationManager::validateCAFile(const std::string& ca_path) {
+    return fileExists(ca_path) && isFileReadable(ca_path);
+}
+
+std::chrono::system_clock::time_point ConfigurationManager::extractCertificateExpiry(const std::string& /*cert_path*/) {
+    return std::chrono::system_clock::now();
 }
 
 } // namespace TernaryFission

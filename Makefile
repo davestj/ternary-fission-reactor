@@ -12,12 +12,13 @@
 # - 2025-08-07: Resolved merge conflict in test section - merged FD count testing with system metrics testing
 # - 2025-08-07: Enhanced test system to support multiple test suites with proper dependency management
 # - 2025-08-07: Added comprehensive test harness with platform-specific test execution
+# - 2025-08-09: Automated C++ object discovery and linking via pattern rules
 
 # =============================================================================
 # PROJECT METADATA
 # =============================================================================
 PROJECT_NAME := ternary-fission-reactor
-VERSION := 1.1.13
+VERSION := 2.0.0-rc1
 BUILD_DATE := $(shell date -u +"%Y-%m-%d_%H:%M:%S_UTC")
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
@@ -57,6 +58,7 @@ else
     OPENSSL_FOUND := false
     OPENSSL_INCLUDE :=
     OPENSSL_LIB :=
+endif
 
 # =============================================================================
 # PLATFORM DETECTION
@@ -66,10 +68,10 @@ ARCH := $(shell uname -m)
 PLATFORM := unknown
 
 ifeq ($(UNAME), Darwin)
-        PLATFORM := macos
-        HOMEBREW_PREFIX := $(shell brew --prefix)
-        OPENSSL_PREFIX := $(HOMEBREW_PREFIX)/opt/openssl@3
-        JSONCPP_PREFIX := $(HOMEBREW_PREFIX)/opt/jsoncpp
+	PLATFORM := macos
+	HOMEBREW_PREFIX := $(shell brew --prefix)
+	OPENSSL_PREFIX := $(HOMEBREW_PREFIX)/opt/openssl@3
+	JSONCPP_PREFIX := $(HOMEBREW_PREFIX)/opt/jsoncpp
 endif
 
 ifeq ($(UNAME), Linux)
@@ -94,12 +96,12 @@ LDFLAGS :=
 LIBS := -lm -lpthread
 
 ifeq ($(PLATFORM), macos)
-        CXXFLAGS += -DMACOS
-        CFLAGS += -DMACOS
-        CXXFLAGS += -I$(OPENSSL_PREFIX)/include -I$(JSONCPP_PREFIX)/include
-        LDFLAGS += -L$(OPENSSL_PREFIX)/lib -L$(JSONCPP_PREFIX)/lib
-        LIBS += -lssl -lcrypto -ljsoncpp -framework Security -framework CoreFoundation -lproc
-        CXXFLAGS += -DCPPHTTPLIB_OPENSSL_SUPPORT
+	CXXFLAGS += -DMACOS
+	CFLAGS += -DMACOS
+	CXXFLAGS += -I$(OPENSSL_PREFIX)/include -I$(JSONCPP_PREFIX)/include
+	LDFLAGS += -L$(OPENSSL_PREFIX)/lib -L$(JSONCPP_PREFIX)/lib
+	LIBS += -lssl -lcrypto -ljsoncpp -framework Security -framework CoreFoundation -lproc
+	CXXFLAGS += -DCPPHTTPLIB_OPENSSL_SUPPORT
 endif
 
 
@@ -117,12 +119,14 @@ ifeq ($(PLATFORM),macos)
     endif
 else
     RELEASE_FLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG -march=native -flto
-ifeq ($(PLATFORM), linux)
-        CXXFLAGS += $(shell pkg-config --cflags openssl jsoncpp)
-        LDFLAGS += $(shell pkg-config --libs openssl jsoncpp)
-        CXXFLAGS += -DLINUX
-        CFLAGS += -DLINUX
-        CXXFLAGS += -DCPPHTTPLIB_OPENSSL_SUPPORT
+    ifeq ($(PLATFORM), linux)
+	CXXFLAGS += $(shell pkg-config --cflags openssl jsoncpp)
+	LDFLAGS += $(shell pkg-config --libs openssl jsoncpp)
+	CXXFLAGS += -DLINUX
+	CFLAGS += -DLINUX
+	CXXFLAGS += -DCPPHTTPLIB_OPENSSL_SUPPORT
+
+    endif
 
 endif
 
@@ -140,21 +144,20 @@ BIN_DIR := bin
 DIST_DIR := dist
 TEST_DIR := tests
 
+BUILD_TYPE ?= release
+BUILD_SUBDIR := $(BUILD_DIR)/$(BUILD_TYPE)
+
 # Source files
 CPP_SOURCES := $(wildcard $(SRC_DIR)/cpp/*.cpp)
 CPP_HEADERS := $(wildcard $(INCLUDE_DIR)/*.h)
 GO_SOURCES := $(wildcard $(SRC_DIR)/go/*.go)
 
-# Object files (exclude main files to avoid multiple main definitions)
-CPP_OBJS := $(BUILD_DIR)/$(BUILD_TYPE)/physics.utilities.o \
-	    $(BUILD_DIR)/$(BUILD_TYPE)/ternary.fission.simulation.engine.o
+# Object files (exclude main file to avoid multiple definitions)
+CPP_OBJS := $(patsubst %.cpp,$(BUILD_SUBDIR)/%.o,\
+	     $(filter-out main.ternary.fission.application.cpp,\
+	     $(notdir $(wildcard $(SRC_DIR)/cpp/*.cpp))))
+MAIN_OBJ := $(BUILD_SUBDIR)/main.ternary.fission.application.o
 
-BUILD_TYPE ?= release
-BUILD_SUBDIR := $(BUILD_DIR)/$(BUILD_TYPE)
-
-
-CPP_SOURCES := $(wildcard $(CPP_SRC_DIR)/*.cpp)
-CPP_OBJECTS := $(CPP_SOURCES:$(CPP_SRC_DIR)/%.cpp=$(BUILD_SUBDIR)/%.o)
 CPP_MAIN := $(BIN_DIR)/$(PROJECT_NAME)
 GO_BINARY := $(BIN_DIR)/ternary-api
 
@@ -172,7 +175,7 @@ TEST_BINARIES := $(FD_COUNT_TEST) $(SYSTEM_METRICS_TEST) $(INTEGRATION_TEST)
 # =============================================================================
 # TARGETS
 # =============================================================================
-.PHONY: all help clean test qa install docker release dist deb test-fd test-metrics test-integration
+.PHONY: all cpp-build go-build go-test help clean test qa install docker release dist deb test-fd test-metrics test-integration
 
 all: info $(CPP_MAIN) go-build
 
@@ -187,19 +190,16 @@ info:
 
 
 # Link main executable
-$(CPP_MAIN): $(CPP_OBJS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp | $(BIN_DIR)
+$(CPP_MAIN): $(CPP_OBJS) $(MAIN_OBJ) | $(BIN_DIR)
 ifeq ($(BUILD_TYPE),debug)
 	@echo "Building C++ simulation engine (DEBUG)..."
-	$(CXX) $(DEBUG_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) \
-	$(SRC_DIR)/cpp/daemon.ternary.fission.server.cpp $(SRC_DIR)/cpp/config.ternary.fission.server.cpp -o $@ $(LDFLAGS)
+	$(CXX) $(DEBUG_FLAGS) $(VERSION_FLAGS) $(CPP_OBJS) $(MAIN_OBJ) -o $@ $(LDFLAGS) $(LIBS)
 else ifeq ($(BUILD_TYPE),profile)
 	@echo "Building C++ simulation engine (PROFILE)..."
-	$(CXX) $(PROFILE_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) \
-	$(SRC_DIR)/cpp/daemon.ternary.fission.server.cpp $(SRC_DIR)/cpp/config.ternary.fission.server.cpp -o $@ $(LDFLAGS)
+	$(CXX) $(PROFILE_FLAGS) $(VERSION_FLAGS) $(CPP_OBJS) $(MAIN_OBJ) -o $@ $(LDFLAGS) $(LIBS)
 else
 	@echo "Building C++ simulation engine (RELEASE)..."
-	$(CXX) $(RELEASE_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) \
-	$(SRC_DIR)/cpp/daemon.ternary.fission.server.cpp $(SRC_DIR)/cpp/config.ternary.fission.server.cpp -o $@ $(LDFLAGS)
+	$(CXX) $(RELEASE_FLAGS) $(VERSION_FLAGS) $(CPP_OBJS) $(MAIN_OBJ) -o $@ $(LDFLAGS) $(LIBS)
 endif
 	@echo "C++ build complete: $@"
 
@@ -216,9 +216,12 @@ $(TEST_BUILD_DIR):
 $(BUILD_SUBDIR)/%.o: $(CPP_SRC_DIR)/%.cpp | $(BUILD_SUBDIR)
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
 
-$(CPP_MAIN): $(CPP_OBJECTS) | $(BIN_DIR)
-	$(CXX) $(CPP_OBJECTS) $(LDFLAGS) $(LIBS) -o $@
-	@echo "✓ C++ binary built: $@"
+
+# =============================================================================
+# C++ BUILD
+# =============================================================================
+cpp-build: $(CPP_MAIN)
+	@echo "✓ C++ components built"
 
 # =============================================================================
 # GO BUILD
@@ -226,6 +229,13 @@ $(CPP_MAIN): $(CPP_OBJECTS) | $(BIN_DIR)
 go-build:
 	@cd $(GO_SRC_DIR) && $(GO) build -ldflags "-X main.Version=$(VERSION) -X main.BuildDate=$(BUILD_DATE) -X main.GitCommit=$(GIT_COMMIT)" -o ../../$(GO_BINARY)
 	@echo "✓ Go binary built: $(GO_BINARY)"
+
+# =============================================================================
+# GO TEST
+# =============================================================================
+go-test:
+	@cd $(GO_SRC_DIR) && $(GO) test ./...
+	@echo "✓ Go tests passed"
 
 # =============================================================================
 # TEST AND QA
