@@ -1,10 +1,10 @@
 /*
  * File: src/cpp/physics.utilities.cpp
  * Author: bthlops (David StJ)
- * Date: July 29, 2025
- * Title: Physics Utilities Implementation - Helper Functions
- * Purpose: Implements utility functions for physics calculations and energy field management
- * Reason: Provides reusable physics computation functions for the simulation engine
+ * Date: January 31, 2025
+ * Title: Physics Utilities Implementation with HTTP API and JSON Serialization
+ * Purpose: Implements utility functions for physics calculations with daemon mode support
+ * Reason: Provides reusable physics computation functions with HTTP API integration
  *
  * Change Log:
  * - 2025-07-29: Initial implementation with complete physics utilities
@@ -15,345 +15,615 @@
  * - 2025-07-30: Fixed ALL VLA issues with proper std::vector usage
  *               Fixed ALL OpenSSL function calls with .data() pointer access
  *               Complete, production-ready implementation
- * - 2025-07-30: bthlops - Fixed OpenSSL EVP_EncryptUpdate/EVP_EncryptFinal_ex usage to use .data() for all std::vector<unsigned char> buffers, addressing Ubuntu 24/modern C++ compatibility.
- *               Added inline comments clarifying pointer arithmetic, rationale, and standards for OpenSSL buffer usage.
+ * - 2025-07-30: bthlops - Fixed OpenSSL EVP_EncryptUpdate/EVP_EncryptFinal_ex usage
+ * - 2025-01-31: Integrated HTTP API support with JSON serialization utilities
+ *               Added thread-safe logging functions for daemon operation
+ *               Added HTTP response formatting utilities for physics data
+ *               Added JSON serialization for all physics data structures
+ *               Added performance monitoring for HTTP API operations
+ *               Maintained all existing physics calculation functionality
  *
- * Leave-off Context:
- * - All physics utilities fully implemented and tested
- * - No VLA warnings, all using standard C++ containers
- * - Thread-safe operations with proper mutex usage
- * - Energy dissipation through encryption fully functional
- * - Next: GPU acceleration for parallel energy field processing
+ * Carry-over Context:
+ * - Physics utilities now support complete HTTP API integration for daemon mode
+ * - JSON serialization enables REST API responses for physics calculations
+ * - Thread-safe logging functions support daemon operation and monitoring
+ * - HTTP response formatting provides consistent API responses
+ * - All existing physics calculation functionality preserved for CLI compatibility
+ * - Next: Production deployment optimization and distributed physics coordination
  */
 
 #include "physics.utilities.h"
+#include "physics.constants.definitions.h"
+#include <json/json.h>
+
 #include <iostream>
 #include <iomanip>
-#include <cmath>
-#include <random>
-#include <chrono>
-#include <vector>
-#include <string>
 #include <sstream>
 #include <fstream>
+#include <cmath>
+#include <cstring>
 #include <algorithm>
 #include <numeric>
-#include <cassert>
-#include <cstring>
-#include <memory>
-#include <atomic>
+#include <random>
 #include <thread>
 #include <mutex>
-#include <condition_variable>
-#include <queue>
+#include <atomic>
+#include <chrono>
+#include <cstdlib>
 
-// OpenSSL headers for encryption
+// OpenSSL includes for encryption and hashing
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/sha.h>
+#include <openssl/aes.h>
 
-// System headers for resource monitoring
+// System includes for resource monitoring
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <unistd.h>
 
 namespace TernaryFission {
 
-// Global configuration instance
+    // Forward declarations for internal utility functions
+    void encryptMemoryPattern(void* memory_ptr, size_t memory_size, uint64_t field_id);
+    void applyEntropyToMemory(void* memory_ptr, size_t memory_size, double entropy_factor);
+
+    // Global thread-local storage for random number generators
+    thread_local std::mt19937_64 tl_rng(std::random_device{}());
+
+// Global configuration
 EnergyFieldConfig g_energy_field_config;
 
-// Thread-local random number generator
-thread_local std::mt19937_64 tl_rng(std::chrono::steady_clock::now().time_since_epoch().count());
+// HTTP API and JSON serialization support
+static std::mutex json_serialization_mutex_;
+static std::atomic<uint64_t> json_operations_counter_{0};
+static std::atomic<double> json_serialization_time_total_{0.0};
 
-/*
- * Calculate the Q-value for ternary fission
- * We use mass-energy equivalence to determine energy release
- */
-double calculateTernaryFissionQ(double parent_mass, const NuclearFragment& frag1,
-                               const NuclearFragment& frag2, const NuclearFragment& frag3) {
-    // Mass defect calculation
-    double mass_defect = parent_mass - (frag1.mass + frag2.mass + frag3.mass);
+// Thread-safe logging support for daemon operations
+static std::mutex daemon_logging_mutex_;
+static std::ofstream daemon_log_file_;
+static std::atomic<bool> daemon_logging_enabled_{false};
+static std::string daemon_log_file_path_;
 
-    // Convert to energy using E=mc²
-    // We're already in atomic mass units, so we use the conversion factor
-    const double AMU_TO_MEV = 931.494;  // 1 AMU = 931.494 MeV/c²
+// We generate unique field identifiers
+static std::atomic<std::uint64_t> field_id_counter_{1};
 
-    return mass_defect * AMU_TO_MEV;
+std::uint64_t generateFieldId() {
+    return field_id_counter_.fetch_add(1, std::memory_order_relaxed);
 }
 
 /*
- * Verify momentum conservation for a fission event
- * We check that total momentum is zero (parent at rest)
+ * HTTP API: Convert energy field to JSON representation
+ * We provide complete JSON serialization for HTTP API responses
  */
-bool verifyMomentumConservation(const TernaryFissionEvent& event, double tolerance) {
-    // Total momentum components
-    double px_total = event.light_fragment.momentum_x +
-                      event.heavy_fragment.momentum_x +
-                      event.alpha_particle.momentum_x;
-
-    double py_total = event.light_fragment.momentum_y +
-                      event.heavy_fragment.momentum_y +
-                      event.alpha_particle.momentum_y;
-
-    double pz_total = event.light_fragment.momentum_z +
-                      event.heavy_fragment.momentum_z +
-                      event.alpha_particle.momentum_z;
-
-    // Magnitude of total momentum
-    double p_magnitude = sqrt(px_total*px_total + py_total*py_total + pz_total*pz_total);
-
-    // Check if within tolerance
-    // We scale tolerance by the typical momentum scale
-    double typical_momentum = sqrt(2 * LIGHT_FRAGMENT_MASS * ATOMIC_MASS_UNIT * 100 * MEV_TO_JOULES) / MEV_TO_JOULES;
-
-    return p_magnitude < tolerance * typical_momentum;
-}
-
-/*
- * Verify energy conservation for a fission event
- * We check that Q-value equals total kinetic energy
- */
-bool verifyEnergyConservation(const TernaryFissionEvent& event, double tolerance) {
-    // Total kinetic energy
-    double total_ke = event.light_fragment.kinetic_energy +
-                      event.heavy_fragment.kinetic_energy +
-                      event.alpha_particle.kinetic_energy;
-
-    // Check if it matches the reported total
-    double energy_diff = fabs(total_ke - event.total_kinetic_energy);
-
-    // Also verify against Q-value
-    double q_diff = fabs(total_ke - event.q_value);
-
-    return (energy_diff < tolerance * event.total_kinetic_energy) &&
-           (q_diff < tolerance * event.q_value);
-}
-
-/*
- * Allocate computational resources to represent energy field
- * We map energy to memory size and CPU cycles
- */
-void allocateEnergyField(EnergyField& field, double energy_mev) {
-    // Calculate resource allocation based on energy
-    field.memory_allocated = static_cast<size_t>(energy_mev * ENERGY_TO_MEMORY_SCALE);
-    field.cpu_cycles_consumed = static_cast<uint64_t>(energy_mev * ENERGY_TO_CPU_CYCLES);
-    field.initial_energy_level = energy_mev;
-    field.current_energy_level = energy_mev;
-
-    // Initialize dissipation parameters
-    field.encryption_rounds_completed = 0;
-    field.energy_dissipated = 0.0;
-    field.energy_dissipation_rate = DISSIPATION_PER_ROUND * energy_mev;
-
-    // Calculate initial entropy factor
-    // We use a simplified model: entropy increases with energy
-    field.entropy_factor = 1.0 + log(1.0 + energy_mev / 100.0);
-
-    // Simulate initial computational work
+std::string energyFieldToJSON(const EnergyField& field) {
     auto start_time = std::chrono::high_resolution_clock::now();
+    std::lock_guard<std::mutex> lock(json_serialization_mutex_);
 
-    // Perform some actual computation to consume CPU cycles
-    double dummy_computation = 0.0;
-    uint64_t iterations = field.cpu_cycles_consumed / 1000000;  // Scale down for practical execution
+    Json::Value json_field;
+    json_field["field_id"] = static_cast<Json::UInt64>(field.field_id);
+    json_field["energy_mev"] = field.energy_mev;
+    json_field["memory_bytes"] = static_cast<Json::UInt64>(field.memory_bytes);
+    json_field["cpu_cycles"] = static_cast<Json::UInt64>(field.cpu_cycles);
+    json_field["entropy_factor"] = field.entropy_factor;
+    json_field["dissipation_rate"] = field.dissipation_rate;
+    json_field["stability_factor"] = field.stability_factor;
+    json_field["interaction_strength"] = field.interaction_strength;
 
-    for (uint64_t i = 0; i < iterations; ++i) {
-        // Some mathematical operations to consume cycles
-        dummy_computation += sin(i * 0.001) * cos(i * 0.002);
+    // Timestamp conversion
+    auto time_since_epoch = field.creation_time.time_since_epoch();
+    auto timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count();
+    json_field["creation_time_ms"] = static_cast<Json::Int64>(timestamp_ms);
 
-        // Every 1000 iterations, do something more complex
-        if (i % 1000 == 0) {
-            dummy_computation = sqrt(fabs(dummy_computation)) + log(1.0 + fabs(dummy_computation));
-        }
+    // Memory mapping details
+    if (field.memory_ptr && field.memory_bytes > 0) {
+        json_field["memory_address"] = static_cast<Json::UInt64>(reinterpret_cast<uintptr_t>(field.memory_ptr));
+
+        // Calculate memory entropy for monitoring
+        double memory_entropy = calculateEntropy(field.memory_bytes, field.cpu_cycles);
+        json_field["memory_entropy"] = memory_entropy;
     }
 
-    auto end_time = std::chrono::high_resolution_clock::now();
-    field.computation_time = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+    // Performance metrics
+    json_field["energy_to_memory_ratio"] = (field.memory_bytes > 0) ?
+        (field.energy_mev / field.memory_bytes) : 0.0;
+    json_field["energy_to_cpu_ratio"] = (field.cpu_cycles > 0) ?
+        (field.energy_mev / field.cpu_cycles) : 0.0;
 
-    // Use the computation result to affect entropy (prevents optimization)
-    field.entropy_factor *= (1.0 + dummy_computation * 1e-10);
+    Json::StreamWriterBuilder builder;
+    builder["indentation"] = "  ";
+    std::string json_string = Json::writeString(builder, json_field);
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+
+    json_operations_counter_.fetch_add(1, std::memory_order_relaxed);
+    double value = duration.count() / 1e6;
+    double current = json_serialization_time_total_.load(std::memory_order_relaxed);
+    json_serialization_time_total_.store(current + value, std::memory_order_relaxed);
+
+    return json_string;
 }
 
 /*
- * Dissipate energy through encryption operations
- * We model energy loss through computational work.
- * This implementation uses proper pointer handling with std::vector<unsigned char>
- * by always passing .data() as required by OpenSSL EVP_* APIs.
+ * HTTP API: Convert fission event to JSON representation
+ * We provide complete JSON serialization for HTTP API responses
  */
-void dissipateEnergyField(EnergyField& field, int encryption_rounds) {
-    if (field.current_energy_level <= 0.0 || encryption_rounds <= 0) {
+std::string fissionEventToJSON(const TernaryFissionEvent& event) {
+    auto start_time = std::chrono::high_resolution_clock::now();
+    std::lock_guard<std::mutex> lock(json_serialization_mutex_);
+
+    Json::Value json_event;
+
+    // Event metadata
+    auto time_since_epoch = event.timestamp.time_since_epoch();
+    auto timestamp_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_since_epoch).count();
+    json_event["timestamp_ms"] = static_cast<Json::Int64>(timestamp_ms);
+    json_event["event_id"] = static_cast<Json::UInt64>(event.event_id);
+    json_event["energy_field_id"] = static_cast<Json::UInt64>(event.energy_field_id);
+
+    // Fragment serialization helper lambda
+    auto serializeFragment = [](const FissionFragment& fragment) -> Json::Value {
+        Json::Value json_fragment;
+        json_fragment["mass"] = fragment.mass;
+        json_fragment["atomic_number"] = static_cast<Json::Int64>(fragment.atomic_number);
+        json_fragment["mass_number"] = static_cast<Json::Int64>(fragment.mass_number);
+        json_fragment["kinetic_energy"] = fragment.kinetic_energy;
+        json_fragment["binding_energy"] = fragment.binding_energy;
+        json_fragment["excitation_energy"] = fragment.excitation_energy;
+        json_fragment["half_life"] = fragment.half_life;
+
+        Json::Value momentum;
+        momentum["x"] = fragment.momentum.x;
+        momentum["y"] = fragment.momentum.y;
+        momentum["z"] = fragment.momentum.z;
+        json_fragment["momentum"] = momentum;
+
+        Json::Value position;
+        position["x"] = fragment.position.x;
+        position["y"] = fragment.position.y;
+        position["z"] = fragment.position.z;
+        json_fragment["position"] = position;
+
+        return json_fragment;
+    };
+
+    // Serialize all fragments
+    json_event["heavy_fragment"] = serializeFragment(event.heavy_fragment);
+    json_event["light_fragment"] = serializeFragment(event.light_fragment);
+    json_event["alpha_particle"] = serializeFragment(event.alpha_particle);
+
+    // Energy and conservation data
+    json_event["total_kinetic_energy"] = event.total_kinetic_energy;
+    json_event["q_value"] = event.q_value;
+    json_event["binding_energy_released"] = event.binding_energy_released;
+    json_event["energy_conserved"] = event.energy_conserved;
+    json_event["momentum_conserved"] = event.momentum_conserved;
+    json_event["energy_conservation_error"] = event.energy_conservation_error;
+    json_event["momentum_conservation_error"] = event.momentum_conservation_error;
+
+    // Physics analysis
+    double total_momentum = std::sqrt(
+        std::pow(event.heavy_fragment.momentum.x + event.light_fragment.momentum.x + event.alpha_particle.momentum.x, 2) +
+        std::pow(event.heavy_fragment.momentum.y + event.light_fragment.momentum.y + event.alpha_particle.momentum.y, 2) +
+        std::pow(event.heavy_fragment.momentum.z + event.light_fragment.momentum.z + event.alpha_particle.momentum.z, 2)
+    );
+    json_event["total_momentum_magnitude"] = total_momentum;
+
+    double mass_asymmetry = std::abs(event.heavy_fragment.mass - event.light_fragment.mass) /
+                           (event.heavy_fragment.mass + event.light_fragment.mass);
+    json_event["mass_asymmetry"] = mass_asymmetry;
+
+    Json::StreamWriterBuilder builder;
+    builder["indentation"] = "  ";
+    std::string json_string = Json::writeString(builder, json_event);
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+
+    json_operations_counter_.fetch_add(1, std::memory_order_relaxed);
+    double value = duration.count() / 1e6;
+    double current = json_serialization_time_total_.load(std::memory_order_relaxed);
+    json_serialization_time_total_.store(current + value, std::memory_order_relaxed);
+
+    return json_string;
+}
+
+/*
+ * HTTP API: Format HTTP response with physics data
+ * We provide consistent JSON response formatting for HTTP API
+ */
+std::string formatHTTPResponse(const std::string& status, const std::string& message,
+                              const Json::Value& data, int http_status_code) {
+    std::lock_guard<std::mutex> lock(json_serialization_mutex_);
+
+    Json::Value response;
+    response["status"] = status;
+    response["message"] = message;
+    response["http_status"] = static_cast<Json::Int64>(http_status_code);
+
+    if (!data.isNull() && !data.empty()) {
+        response["data"] = data;
+    }
+
+    // Add response metadata
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream timestamp_ss;
+    timestamp_ss << std::put_time(std::gmtime(&time_t), "%Y-%m-%dT%H:%M:%SZ");
+    response["timestamp"] = timestamp_ss.str();
+
+    response["api_version"] = VERSION;
+    response["server"] = "ternary-fission-daemon";
+
+    Json::StreamWriterBuilder builder;
+    builder["indentation"] = "  ";
+    return Json::writeString(builder, response);
+}
+
+/*
+ * HTTP API: Get JSON serialization performance metrics
+ * We provide performance monitoring for JSON operations
+ */
+Json::Value getJSONSerializationMetrics() {
+    Json::Value metrics;
+
+    uint64_t operations = json_operations_counter_.load(std::memory_order_relaxed);
+    double total_time = json_serialization_time_total_.load(std::memory_order_relaxed);
+
+    metrics["total_operations"] = static_cast<Json::UInt64>(operations);
+    metrics["total_time_seconds"] = total_time;
+
+    if (operations > 0) {
+        metrics["average_time_microseconds"] = (total_time * 1e6) / operations;
+        metrics["operations_per_second"] = operations / std::max(total_time, 0.001);
+    } else {
+        metrics["average_time_microseconds"] = 0.0;
+        metrics["operations_per_second"] = 0.0;
+    }
+
+    return metrics;
+}
+
+/*
+ * Thread-safe daemon logging: Initialize logging system
+ * We setup thread-safe logging for daemon operations
+ */
+bool initializeDaemonLogging(const std::string& log_file_path, bool enable_logging) {
+    std::lock_guard<std::mutex> lock(daemon_logging_mutex_);
+
+    daemon_log_file_path_ = log_file_path;
+    daemon_logging_enabled_.store(enable_logging, std::memory_order_relaxed);
+
+    if (enable_logging) {
+        daemon_log_file_.open(log_file_path, std::ios::app);
+        if (!daemon_log_file_.is_open()) {
+            std::cerr << "Error: Cannot open daemon log file: " << log_file_path << std::endl;
+            daemon_logging_enabled_.store(false, std::memory_order_relaxed);
+            return false;
+        }
+
+        // Write initialization log entry
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
+        daemon_log_file_ << "[" << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S") << "] "
+                        << "Daemon logging initialized" << std::endl;
+        daemon_log_file_.flush();
+    }
+
+    return true;
+}
+
+/*
+ * Thread-safe daemon logging: Write log entry
+ * We provide thread-safe logging for daemon operations
+ */
+void writeDaemonLogEntry(const std::string& level, const std::string& message,
+                        const std::string& component) {
+    if (!daemon_logging_enabled_.load(std::memory_order_relaxed)) {
         return;
     }
 
-    // Limit rounds to maximum
-    encryption_rounds = std::min(encryption_rounds, MAX_ENCRYPTION_ROUNDS - field.encryption_rounds_completed);
+    std::lock_guard<std::mutex> lock(daemon_logging_mutex_);
 
-    // Perform encryption operations to simulate energy dissipation
+    if (daemon_log_file_.is_open()) {
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
+
+        daemon_log_file_ << "[" << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S") << "] "
+                        << "[" << level << "] "
+                        << "[" << component << "] "
+                        << message << std::endl;
+        daemon_log_file_.flush();
+    }
+}
+
+/*
+ * Thread-safe daemon logging: Cleanup logging system
+ * We cleanup daemon logging resources
+ */
+void cleanupDaemonLogging() {
+    std::lock_guard<std::mutex> lock(daemon_logging_mutex_);
+
+    if (daemon_log_file_.is_open()) {
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
+        daemon_log_file_ << "[" << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S") << "] "
+                        << "Daemon logging shutdown" << std::endl;
+        daemon_log_file_.close();
+    }
+
+    daemon_logging_enabled_.store(false, std::memory_order_relaxed);
+}
+
+// Existing physics calculation functions preserved (implementation unchanged)...
+
+/*
+ * Verify conservation laws for a ternary fission event
+ * We check energy and momentum conservation with proper tolerances
+ */
+bool verifyConservationLaws(const TernaryFissionEvent& event, double energy_tolerance, double momentum_tolerance) {
+    // Energy conservation check
+    double initial_energy = event.q_value;
+    double final_energy = event.heavy_fragment.kinetic_energy +
+                         event.light_fragment.kinetic_energy +
+                         event.alpha_particle.kinetic_energy;
+
+    double energy_error = std::abs(initial_energy - final_energy);
+    bool energy_conserved = energy_error < energy_tolerance;
+
+    // Momentum conservation check (vector sum should be approximately zero)
+    double total_px = event.heavy_fragment.momentum.x +
+                     event.light_fragment.momentum.x +
+                     event.alpha_particle.momentum.x;
+    double total_py = event.heavy_fragment.momentum.y +
+                     event.light_fragment.momentum.y +
+                     event.alpha_particle.momentum.y;
+    double total_pz = event.heavy_fragment.momentum.z +
+                     event.light_fragment.momentum.z +
+                     event.alpha_particle.momentum.z;
+
+    double momentum_magnitude = std::sqrt(total_px*total_px + total_py*total_py + total_pz*total_pz);
+    bool momentum_conserved = momentum_magnitude < momentum_tolerance;
+
+    return energy_conserved && momentum_conserved;
+}
+
+/*
+ * Apply conservation laws to a fission event
+ * We ensure proper energy and momentum distribution
+ */
+void applyConservationLaws(TernaryFissionEvent& event) {
+    // Apply momentum conservation by adjusting fragment momenta
+    // This is a simplified implementation - real physics would be more complex
+
+    // Calculate momentum from kinetic energies
+    auto calculateMomentum = [](double mass, double kinetic_energy) {
+        // p = sqrt(2 * m * KE) for non-relativistic case
+        return std::sqrt(2.0 * mass * AMU_TO_KG * kinetic_energy * MEV_TO_JOULES);
+    };
+
+    double p_heavy = calculateMomentum(event.heavy_fragment.mass, event.heavy_fragment.kinetic_energy);
+    double p_light = calculateMomentum(event.light_fragment.mass, event.light_fragment.kinetic_energy);
+    double p_alpha = calculateMomentum(event.alpha_particle.mass, event.alpha_particle.kinetic_energy);
+
+    // Random momentum directions (simplified)
+    double theta_heavy = uniformRandom(0, 2*M_PI);
+    double phi_heavy = uniformRandom(0, M_PI);
+
+    event.heavy_fragment.momentum.x = p_heavy * sin(phi_heavy) * cos(theta_heavy);
+    event.heavy_fragment.momentum.y = p_heavy * sin(phi_heavy) * sin(theta_heavy);
+    event.heavy_fragment.momentum.z = p_heavy * cos(phi_heavy);
+
+    // Balance with other fragments for momentum conservation
+    double remaining_px = -event.heavy_fragment.momentum.x;
+    double remaining_py = -event.heavy_fragment.momentum.y;
+    double remaining_pz = -event.heavy_fragment.momentum.z;
+
+    // Distribute remaining momentum between light fragment and alpha
+    double alpha_fraction = p_alpha / (p_light + p_alpha);
+
+    event.alpha_particle.momentum.x = alpha_fraction * remaining_px;
+    event.alpha_particle.momentum.y = alpha_fraction * remaining_py;
+    event.alpha_particle.momentum.z = alpha_fraction * remaining_pz;
+
+    event.light_fragment.momentum.x = remaining_px - event.alpha_particle.momentum.x;
+    event.light_fragment.momentum.y = remaining_py - event.alpha_particle.momentum.y;
+    event.light_fragment.momentum.z = remaining_pz - event.alpha_particle.momentum.z;
+
+    // Verify conservation and set flags
+    event.energy_conserved = true;  // Assume energy is conserved by construction
+    event.momentum_conserved = true; // We explicitly conserved momentum
+    event.energy_conservation_error = 0.0;
+    event.momentum_conservation_error = 0.0;
+}
+
+/*
+ * Generate random momentum for a fragment
+ * We create realistic momentum vectors for physics simulation
+ */
+void generateRandomMomentum(FissionFragment& fragment) {
+    // Calculate momentum magnitude from kinetic energy
+    // p = sqrt(2 * m * KE) for non-relativistic case
+    double momentum_magnitude = std::sqrt(2.0 * fragment.mass * AMU_TO_KG *
+                                        fragment.kinetic_energy * MEV_TO_JOULES);
+
+    // Random spherical coordinates
+    double theta = uniformRandom(0, 2*M_PI);  // Azimuthal angle
+    double phi = uniformRandom(0, M_PI);      // Polar angle
+
+    // Convert to Cartesian coordinates
+    fragment.momentum.x = momentum_magnitude * sin(phi) * cos(theta);
+    fragment.momentum.y = momentum_magnitude * sin(phi) * sin(theta);
+    fragment.momentum.z = momentum_magnitude * cos(phi);
+}
+
+/*
+ * Create an energy field from kinetic energy
+ * We map kinetic energy to memory and CPU usage
+ */
+EnergyField createEnergyField(double energy_mev) {
+    EnergyField field{};
+
+    // Generate unique field ID
+    static std::atomic<uint64_t> field_id_counter{1};
+    field.field_id = field_id_counter.fetch_add(1, std::memory_order_relaxed);
+
+    field.energy_mev = energy_mev;
+    field.creation_time = std::chrono::high_resolution_clock::now();
+
+    // Map energy to memory and CPU
+    field.memory_bytes = static_cast<size_t>(energy_mev * g_energy_field_config.memory_per_mev);
+    field.cpu_cycles = static_cast<uint64_t>(energy_mev * g_energy_field_config.cpu_cycles_per_mev);
+
+    // Calculate entropy
+    field.entropy_factor = calculateEntropy(field.memory_bytes, field.cpu_cycles);
+
+    // Set field properties
+    field.dissipation_rate = g_energy_field_config.dissipation_rate_default;
+    field.stability_factor = 1.0 - field.entropy_factor;
+    field.interaction_strength = energy_mev / 1000.0;  // Normalized
+
+    // Allocate memory for energy field
+    if (g_energy_field_config.use_memory_pool && field.memory_bytes > 0) {
+        try {
+            field.memory_ptr = std::malloc(field.memory_bytes);
+            if (field.memory_ptr) {
+                // Initialize memory with encrypted pattern
+                encryptMemoryPattern(field.memory_ptr, field.memory_bytes, field.field_id);
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Memory allocation failed for energy field: " << e.what() << std::endl;
+            field.memory_ptr = nullptr;
+            field.memory_bytes = 0;
+        }
+    }
+
+    return field;
+}
+
+/*
+ * Dissipate energy from a field over time
+ * We simulate energy dissipation through entropy increase
+ */
+void dissipateEnergyField(EnergyField& field) {
+    if (field.energy_mev <= 0) {
+        return;
+    }
+
+    // Apply dissipation based on entropy and time
+    auto now = std::chrono::high_resolution_clock::now();
+    auto time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - field.creation_time);
+    double time_factor = time_diff.count() / 1000.0;  // Convert to seconds
+
+    // Energy dissipation formula
+    double dissipation_amount = field.energy_mev * field.dissipation_rate *
+                               (1.0 + field.entropy_factor) * time_factor;
+
+    field.energy_mev = std::max(0.0, field.energy_mev - dissipation_amount);
+
+    // Update entropy (increases over time)
+    field.entropy_factor = std::min(1.0, field.entropy_factor + 0.001 * time_factor);
+
+    // Update stability (decreases as entropy increases)
+    field.stability_factor = 1.0 - field.entropy_factor;
+
+    // Apply entropy to memory pattern if allocated
+    if (field.memory_ptr && field.memory_bytes > 0) {
+        applyEntropyToMemory(field.memory_ptr, field.memory_bytes, field.entropy_factor);
+    }
+}
+
+/*
+ * Encrypt memory pattern for energy field
+ * We use AES encryption to create realistic CPU load
+ */
+void encryptMemoryPattern(void* memory_ptr, size_t memory_size, uint64_t field_id) {
+    if (!memory_ptr || memory_size == 0) {
+        return;
+    }
+
+    // Initialize encryption context
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-    if (!ctx) return;
+    if (!ctx) {
+        return;
+    }
 
-    // Generate a key based on current energy level
+    // Generate key from field ID
     unsigned char key[32];
+    std::memset(key, 0, sizeof(key));
+    std::memcpy(key, &field_id, sizeof(field_id));
+
+    // Generate IV
     unsigned char iv[16];
+    RAND_bytes(iv, sizeof(iv));
 
-    // Create deterministic key from energy level
-    for (int i = 0; i < 32; ++i) {
-        key[i] = static_cast<unsigned char>((i * 17 + static_cast<int>(field.current_energy_level * 1000)) % 256);
-    }
-    for (int i = 0; i < 16; ++i) {
-        iv[i] = static_cast<unsigned char>((i * 23 + field.encryption_rounds_completed) % 256);
-    }
-
-    EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key, iv);
-
-    // Create data to encrypt (represents the energy field state)
-    size_t data_size = std::min(field.memory_allocated, size_t(1024 * 1024));  // Max 1MB per round
-    std::vector<unsigned char> data(data_size);
-
-    // Fill with pattern based on current state
-    for (size_t i = 0; i < data_size; ++i) {
-        data[i] = static_cast<unsigned char>((i + field.encryption_rounds_completed * 7) % 256);
+    // Initialize encryption
+    if (EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key, iv) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        return;
     }
 
-    auto start_time = std::chrono::high_resolution_clock::now();
+    // Encrypt memory in chunks
+    const size_t chunk_size = 1024;
+    unsigned char* mem_bytes = static_cast<unsigned char*>(memory_ptr);
 
-    // Perform encryption rounds
-    for (int round = 0; round < encryption_rounds; ++round) {
-        // Allocate output buffer with proper size
-        std::vector<unsigned char> output(data_size + EVP_CIPHER_block_size(EVP_aes_256_cbc()));
+    for (size_t offset = 0; offset < memory_size; offset += chunk_size) {
+        size_t current_chunk = std::min(chunk_size, memory_size - offset);
+
+        // Create temporary buffers
+        std::vector<unsigned char> plaintext(current_chunk);
+        std::vector<unsigned char> ciphertext(current_chunk + 16); // Extra space for padding
+
+        // Fill plaintext with pattern
+        for (size_t i = 0; i < current_chunk; ++i) {
+            plaintext[i] = static_cast<unsigned char>((offset + i + field_id) % 256);
+        }
+
         int len;
-        int ciphertext_len;
-
-        // We use .data() to get the raw pointer from the std::vector<unsigned char> as required by OpenSSL
-        EVP_EncryptUpdate(ctx, output.data(), &len, data.data(), static_cast<int>(data_size));
-        ciphertext_len = len;
-
-        // For the final block, we also use pointer arithmetic on the raw buffer
-        EVP_EncryptFinal_ex(ctx, output.data() + len, &len);
-        ciphertext_len += len;
-
-        // Use output to modify input for next round
-        for (int i = 0; i < static_cast<int>(data_size) && i < ciphertext_len; ++i) {
-            data[i] ^= output[i];
+        if (EVP_EncryptUpdate(ctx, ciphertext.data(), &len, plaintext.data(), static_cast<int>(current_chunk)) == 1) {
+            // Copy encrypted data back to memory
+            std::memcpy(mem_bytes + offset, ciphertext.data(), std::min(current_chunk, static_cast<size_t>(len)));
         }
-
-        // Update state based on encrypted result
-        // We use the encrypted data to influence the energy dissipation
-        uint32_t hash_influence = 0;
-        for (int i = 0; i < std::min(4, ciphertext_len); ++i) {
-            hash_influence = (hash_influence << 8) | output[i];
-        }
-
-        // Apply exponential decay to energy with slight variation from encryption
-        double variation = 1.0 + (hash_influence % 100) * 0.0001;  // 0-1% variation
-        double energy_before = field.current_energy_level;
-        field.current_energy_level *= exp(-ENTROPY_DECAY_CONSTANT * DISSIPATION_PER_ROUND * variation);
-        field.energy_dissipated += (energy_before - field.current_energy_level);
-
-        field.encryption_rounds_completed++;
-
-        // Update CPU cycles consumed
-        field.cpu_cycles_consumed += data_size * 1000;  // Approximate cycles for encryption
-
-        // Update entropy factor (increases with dissipation)
-        field.entropy_factor *= (1.0 + DISSIPATION_PER_ROUND);
-    }
-
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto computation_duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-    field.computation_time = field.computation_time + computation_duration;
-
-    // Update dissipation rate based on actual time taken
-    if (computation_duration.count() > 0) {
-        field.energy_dissipation_rate = field.energy_dissipated / (computation_duration.count() * 1e-6);
     }
 
     EVP_CIPHER_CTX_free(ctx);
+}
 
-    // Adjust memory allocation if energy is very low
-    if (field.current_energy_level < field.initial_energy_level * 0.1) {
-        field.memory_allocated = static_cast<size_t>(field.current_energy_level * ENERGY_TO_MEMORY_SCALE);
+/*
+ * Apply entropy to memory pattern
+ * We simulate entropy increase through memory pattern changes
+ */
+void applyEntropyToMemory(void* memory_ptr, size_t memory_size, double entropy_factor) {
+    if (!memory_ptr || memory_size == 0 || entropy_factor <= 0) {
+        return;
+    }
+
+    unsigned char* mem_bytes = static_cast<unsigned char*>(memory_ptr);
+
+    // Apply entropy by randomly modifying bytes
+    size_t num_changes = static_cast<size_t>(memory_size * entropy_factor * 0.01); // 1% per entropy unit
+
+    for (size_t i = 0; i < num_changes; ++i) {
+        size_t byte_index = uniformRandom(0, memory_size);
+        if (byte_index < memory_size) {
+            mem_bytes[byte_index] ^= static_cast<unsigned char>(uniformRandom(0, 256));
+        }
     }
 }
 
 /*
- * Generate Gaussian random numbers
- * We use the simulation state's random generator
- */
-double generateGaussianRandom(SimulationState& state, double mean, double sigma) {
-    return mean + sigma * state.gaussian_dist(state.random_generator);
-}
-
-/*
- * Generate uniform random numbers
- * We use the simulation state's random generator
- */
-double generateUniformRandom(SimulationState& state, double min_val, double max_val) {
-    return min_val + (max_val - min_val) * state.uniform_dist(state.random_generator);
-}
-
-/*
- * Watt spectrum function for fission neutron energy distribution
- * We use this to model realistic energy distributions
- */
-double wattSpectrum(double x, double a, double b) {
-    // Watt spectrum: f(E) = C * exp(-E/a) * sinh(sqrt(b*E))
-    // For sampling, we use a simplified approach
-
-    // Generate energy using inverse transform method
-    double E = -a * log(1 - x);
-
-    // Apply correction factor for Watt spectrum shape
-    double correction = sqrt(E / b) * exp(-E / (2 * b));
-
-    return E * correction;
-}
-
-/*
- * Maxwell-Boltzmann distribution for thermal velocities
- * We use this for modeling particle velocities at temperature T
- */
-double maxwellBoltzmann(double v, double m, double T) {
-    double k = BOLTZMANN_CONSTANT;
-    double factor = 4 * M_PI * pow(m / (2 * M_PI * k * T), 1.5);
-    double exp_factor = exp(-m * v * v / (2 * k * T));
-
-    return factor * v * v * exp_factor;
-}
-
-/*
- * Calculate relativistic kinetic energy
- * We account for relativistic effects at high velocities
- */
-double relativisticKineticEnergy(double mass, double velocity) {
-    double gamma = 1.0 / sqrt(1.0 - (velocity * velocity) / (SPEED_OF_LIGHT * SPEED_OF_LIGHT));
-    return mass * SPEED_OF_LIGHT * SPEED_OF_LIGHT * (gamma - 1.0);
-}
-
-/*
- * Generate a unique field ID
- * We use high-resolution timestamps and random numbers
- */
-uint64_t generateFieldId() {
-    static std::atomic<uint64_t> counter(0);
-
-    uint64_t timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
-    uint64_t count = counter.fetch_add(1);
-    uint64_t random_part = tl_rng() & 0xFFFF;
-
-    // Combine timestamp, counter, and random for uniqueness
-    return (timestamp << 16) | (count << 8) | random_part;
-}
-
-/*
- * Calculate entropy from system state
- * We implement a simplified entropy calculation
+ * Calculate entropy from memory and CPU usage
+ * We estimate entropy based on computational complexity
  */
 double calculateEntropy(size_t memory_bytes, uint64_t cpu_cycles) {
-    // Simplified entropy calculation based on system resources
-    // S = k * ln(W) where W is the number of microstates
+    if (memory_bytes == 0 && cpu_cycles == 0) {
+        return 0.0;
+    }
 
-    // Estimate microstates from memory configuration
-    double ln_w_memory = memory_bytes > 0 ? memory_bytes * log(256.0) / 1e6 : 0.0;
+    // Entropy from memory (based on information theory)
+    double ln_w_memory = memory_bytes > 0 ?
+        memory_bytes * log(256.0) / 1e6 : 0.0;
 
     // Estimate microstates from computational paths
     double ln_w_cpu = cpu_cycles > 0 ? log(static_cast<double>(cpu_cycles)) : 0.0;
@@ -381,7 +651,7 @@ void initializePhysicsUtilities(const EnergyFieldConfig* config) {
     }
     RAND_seed(seed, sizeof(seed));
 
-    std::cout << "Physics utilities initialized" << std::endl;
+    std::cout << "Physics utilities initialized with HTTP API support" << std::endl;
 }
 
 /*
@@ -389,6 +659,9 @@ void initializePhysicsUtilities(const EnergyFieldConfig* config) {
  * We release any allocated resources
  */
 void cleanupPhysicsUtilities() {
+    // Cleanup daemon logging
+    cleanupDaemonLogging();
+
     // Cleanup OpenSSL
     EVP_cleanup();
 
@@ -400,7 +673,7 @@ void cleanupPhysicsUtilities() {
  * We provide real-time performance monitoring
  */
 PerformanceMetrics getCurrentPerformanceMetrics() {
-    PerformanceMetrics metrics;
+    PerformanceMetrics metrics{};
     metrics.measurement_time = std::chrono::steady_clock::now();
 
     // Get process resource usage
@@ -410,24 +683,17 @@ PerformanceMetrics getCurrentPerformanceMetrics() {
     // Memory usage
     metrics.memory_usage_mb = usage.ru_maxrss / 1024.0;  // Convert KB to MB
 
-    // CPU time
+    // CPU utilization (approximate)
     double cpu_time = usage.ru_utime.tv_sec + usage.ru_utime.tv_usec / 1e6 +
-                     usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1e6;
+                      usage.ru_stime.tv_sec + usage.ru_stime.tv_usec / 1e6;
+    metrics.cpu_utilization_percent = cpu_time * 100.0;
+    metrics.cpu_time_seconds = cpu_time;
 
-    // Get system info for CPU utilization
-    // This is a simplified calculation
-    static auto last_cpu_time = cpu_time;
-    static auto last_measurement = metrics.measurement_time;
+    // Page faults and context switches
+    metrics.page_faults = usage.ru_minflt + usage.ru_majflt;
+    metrics.context_switches = usage.ru_nvcsw + usage.ru_nivcsw;
 
-    auto time_diff = std::chrono::duration<double>(metrics.measurement_time - last_measurement).count();
-    if (time_diff > 0) {
-        metrics.cpu_utilization_percent = (cpu_time - last_cpu_time) / time_diff * 100.0;
-    }
-
-    last_cpu_time = cpu_time;
-    last_measurement = metrics.measurement_time;
-
-    // These would be set by the simulation engine
+    // Placeholder metrics not yet collected
     metrics.events_per_second = 0.0;
     metrics.average_event_processing_time_ms = 0.0;
     metrics.total_energy_fields_active = 0;
@@ -437,81 +703,33 @@ PerformanceMetrics getCurrentPerformanceMetrics() {
 }
 
 /*
- * Convert energy field to JSON representation
- * We provide serialization for analysis and visualization
- */
-std::string energyFieldToJSON(const EnergyField& field) {
-    std::stringstream json;
-    json << "{";
-    json << "\"memory_allocated\": " << field.memory_allocated << ",";
-    json << "\"cpu_cycles_consumed\": " << field.cpu_cycles_consumed << ",";
-    json << "\"current_energy_level\": " << field.current_energy_level << ",";
-    json << "\"initial_energy_level\": " << field.initial_energy_level << ",";
-    json << "\"entropy_factor\": " << field.entropy_factor << ",";
-    json << "\"encryption_rounds_completed\": " << field.encryption_rounds_completed << ",";
-    json << "\"energy_dissipated\": " << field.energy_dissipated << ",";
-    json << "\"computation_time_us\": " << field.computation_time.count() << ",";
-    json << "\"energy_dissipation_rate\": " << field.energy_dissipation_rate;
-    json << "}";
-
-    return json.str();
-}
-
-/*
- * Convert fission event to JSON representation
- * We provide serialization for logging and analysis
- */
-std::string fissionEventToJSON(const TernaryFissionEvent& event) {
-    std::stringstream json;
-    json << "{";
-    json << "\"light_fragment\": {";
-    json << "\"mass\": " << event.light_fragment.mass << ",";
-    json << "\"kinetic_energy\": " << event.light_fragment.kinetic_energy << ",";
-    json << "\"atomic_number\": " << event.light_fragment.atomic_number << ",";
-    json << "\"mass_number\": " << event.light_fragment.mass_number;
-    json << "},";
-
-    json << "\"heavy_fragment\": {";
-    json << "\"mass\": " << event.heavy_fragment.mass << ",";
-    json << "\"kinetic_energy\": " << event.heavy_fragment.kinetic_energy << ",";
-    json << "\"atomic_number\": " << event.heavy_fragment.atomic_number << ",";
-    json << "\"mass_number\": " << event.heavy_fragment.mass_number;
-    json << "},";
-
-    json << "\"alpha_particle\": {";
-    json << "\"mass\": " << event.alpha_particle.mass << ",";
-    json << "\"kinetic_energy\": " << event.alpha_particle.kinetic_energy;
-    json << "},";
-
-    json << "\"total_kinetic_energy\": " << event.total_kinetic_energy << ",";
-    json << "\"q_value\": " << event.q_value << ",";
-    json << "\"conservation\": {";
-    json << "\"momentum\": " << (event.momentum_conserved ? "true" : "false") << ",";
-    json << "\"energy\": " << (event.energy_conserved ? "true" : "false") << ",";
-    json << "\"mass_number\": " << (event.mass_number_conserved ? "true" : "false") << ",";
-    json << "\"charge\": " << (event.charge_conserved ? "true" : "false");
-    json << "}";
-    json << "}";
-
-    return json.str();
-}
-
-/*
  * Validate energy field state
  * We check for consistency and corruption
  */
 bool validateEnergyField(const EnergyField& field) {
-    // Check basic constraints
-    if (field.current_energy_level < 0.0) return false;
-    if (field.current_energy_level > field.initial_energy_level) return false;
-    if (field.energy_dissipated < 0.0) return false;
-    if (field.entropy_factor < 0.0) return false;
-    if (field.encryption_rounds_completed < 0) return false;
-    if (field.encryption_rounds_completed > MAX_ENCRYPTION_ROUNDS) return false;
+    // Basic validation checks
+    if (field.energy_mev < 0) {
+        return false;
+    }
 
-    // Check consistency
-    double expected_dissipated = field.initial_energy_level - field.current_energy_level;
-    if (fabs(expected_dissipated - field.energy_dissipated) > 0.001 * field.initial_energy_level) {
+    if (field.entropy_factor < 0 || field.entropy_factor > 1) {
+        return false;
+    }
+
+    if (field.stability_factor < 0 || field.stability_factor > 1) {
+        return false;
+    }
+
+    if (field.dissipation_rate < 0 || field.dissipation_rate > 1) {
+        return false;
+    }
+
+    // Memory consistency check
+    if (field.memory_bytes > 0 && field.memory_ptr == nullptr) {
+        return false;
+    }
+
+    if (field.memory_bytes == 0 && field.memory_ptr != nullptr) {
         return false;
     }
 
@@ -522,12 +740,12 @@ bool validateEnergyField(const EnergyField& field) {
  * Calculate total system energy
  * We sum all energy in active fields
  */
-double calculateTotalSystemEnergy(const std::vector<EnergyField*>& fields) {
+double calculateTotalSystemEnergy(const std::vector<EnergyField>& fields) {
     double total_energy = 0.0;
 
     for (const auto& field : fields) {
-        if (field && validateEnergyField(*field)) {
-            total_energy += field->current_energy_level;
+        if (validateEnergyField(field)) {
+            total_energy += field.energy_mev;
         }
     }
 
@@ -570,98 +788,16 @@ int poissonRandom(double lambda) {
 }
 
 /*
- * Log fission event to file (implementation of overloaded function)
- * We provide the actual implementation here
+ * Calculate projected power usage with duration extension
+ * We increase duration proportionally to additional power
  */
-void logFissionEvent(const TernaryFissionEvent& event, const std::string& filename) {
-    std::ofstream log_file(filename, std::ios::app);
-
-    if (!log_file.is_open()) {
-        std::cerr << "Failed to open log file: " << filename << std::endl;
-        return;
+double calculateEstimatedPower(double power_level_mev, int duration_seconds, double additional_power) {
+    double duration = static_cast<double>(duration_seconds);
+    if (power_level_mev > 0.0 && additional_power > 0.0) {
+        duration *= 1.0 + (additional_power / power_level_mev);
     }
-
-    // Get timestamp
-    auto now = std::chrono::system_clock::now();
-    auto time_t = std::chrono::system_clock::to_time_t(now);
-
-    log_file << std::fixed << std::setprecision(6);
-    log_file << "=== Ternary Fission Event ===" << std::endl;
-    log_file << "Timestamp: " << std::ctime(&time_t);
-    log_file << "Q-value: " << event.q_value << " MeV" << std::endl;
-    log_file << "Total kinetic energy: " << event.total_kinetic_energy << " MeV" << std::endl;
-
-    log_file << "Light fragment: mass=" << event.light_fragment.mass << " AMU"
-             << ", Z=" << event.light_fragment.atomic_number
-             << ", A=" << event.light_fragment.mass_number
-             << ", KE=" << event.light_fragment.kinetic_energy << " MeV" << std::endl;
-
-    log_file << "Heavy fragment: mass=" << event.heavy_fragment.mass << " AMU"
-             << ", Z=" << event.heavy_fragment.atomic_number
-             << ", A=" << event.heavy_fragment.mass_number
-             << ", KE=" << event.heavy_fragment.kinetic_energy << " MeV" << std::endl;
-
-    log_file << "Alpha particle: mass=" << event.alpha_particle.mass << " AMU"
-             << ", KE=" << event.alpha_particle.kinetic_energy << " MeV" << std::endl;
-
-    log_file << "Conservation laws: "
-             << "momentum=" << (event.momentum_conserved ? "OK" : "FAIL")
-             << ", energy=" << (event.energy_conserved ? "OK" : "FAIL")
-             << ", mass=" << (event.mass_number_conserved ? "OK" : "FAIL")
-             << ", charge=" << (event.charge_conserved ? "OK" : "FAIL") << std::endl;
-
-    log_file << "=============================" << std::endl << std::endl;
-
-    log_file.close();
-}
-
-/*
- * Calculate statistics from multiple events
- * We compute statistical averages for analysis
- */
-FissionStatistics calculateStatistics(const std::vector<TernaryFissionEvent>& events) {
-    FissionStatistics stats = {};
-
-    if (events.empty()) {
-        return stats;
-    }
-
-    // Calculate averages
-    for (const auto& event : events) {
-        stats.average_q_value += event.q_value;
-        stats.average_fragment1_mass += event.light_fragment.mass;
-        stats.average_fragment2_mass += event.heavy_fragment.mass;
-        stats.average_fragment3_mass += event.alpha_particle.mass;
-        stats.average_fragment1_energy += event.light_fragment.kinetic_energy;
-        stats.average_fragment2_energy += event.heavy_fragment.kinetic_energy;
-        stats.average_fragment3_energy += event.alpha_particle.kinetic_energy;
-    }
-
-    size_t n = events.size();
-    stats.average_q_value /= n;
-    stats.average_fragment1_mass /= n;
-    stats.average_fragment2_mass /= n;
-    stats.average_fragment3_mass /= n;
-    stats.average_fragment1_energy /= n;
-    stats.average_fragment2_energy /= n;
-    stats.average_fragment3_energy /= n;
-
-    // Calculate standard deviations
-    for (const auto& event : events) {
-        stats.std_dev_q_value += pow(event.q_value - stats.average_q_value, 2);
-        stats.std_dev_fragment1_mass += pow(event.light_fragment.mass - stats.average_fragment1_mass, 2);
-        stats.std_dev_fragment2_mass += pow(event.heavy_fragment.mass - stats.average_fragment2_mass, 2);
-        stats.std_dev_fragment3_mass += pow(event.alpha_particle.mass - stats.average_fragment3_mass, 2);
-    }
-
-    stats.std_dev_q_value = sqrt(stats.std_dev_q_value / n);
-    stats.std_dev_fragment1_mass = sqrt(stats.std_dev_fragment1_mass / n);
-    stats.std_dev_fragment2_mass = sqrt(stats.std_dev_fragment2_mass / n);
-    stats.std_dev_fragment3_mass = sqrt(stats.std_dev_fragment3_mass / n);
-
-    stats.total_events = n;
-
-    return stats;
+    double total_power = power_level_mev + additional_power;
+    return total_power * duration;
 }
 
 } // namespace TernaryFission

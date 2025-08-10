@@ -6,6 +6,7 @@
 ![Language](https://img.shields.io/badge/C%2B%2B-17-blue)
 ![Go Version](https://img.shields.io/badge/Go-1.23%2B-blue)
 ![Platform](https://img.shields.io/badge/Platform-Ubuntu%2024.04-green)
+![v2.0.0-rc1](https://img.shields.io/badge/Version-2.0.0--rc1-orange)
 
 **Author:** bthlops (David StJ)  
 **Version:** 1.1.15-alpha (Latest: [Releases](https://github.com/davestj/ternary-fission-reactor/releases))  
@@ -13,6 +14,62 @@
 **Repository:** https://github.com/davestj/ternary-fission-reactor
 
 High-performance ternary nuclear fission simulation with C++ physics engine, Go REST API, and Docker deployment. Maps nuclear energy to computational resources with real-time monitoring and conservation law verification using multi-base mathematical frameworks.
+
+
+## Overview
+
+The system emulates ternary nuclear fission to explore how computational resources map to energy production. It pairs a high-speed C++ physics core with a Go-based API and web dashboard for monitoring and interaction.
+
+## Version 2.0.0-rc1 Highlights
+
+- Distributed daemon architecture bridging C++ and Go components
+- Docker-first deployment with real-time monitoring stack
+- Kubernetes-ready configuration and release workflows
+- See [ARCH.md](ARCH.md), [HOW-TO.md](HOW-TO.md), and [NEXT-STEPS.md](NEXT-STEPS.md) for RC milestone details
+
+## Architecture
+
+See [ARCH.md](ARCH.md) for a complete description of the physics engine, API server, monitoring stack, and container layout.
+
+## Build Prerequisites
+
+- Ubuntu 24.04 with build-essential
+- GCC 13+ and C++17 libraries
+- Go 1.23+
+- Optional: Docker and Docker Compose for containerized runs
+
+## Build and Test
+
+```bash
+make cpp-build       # build C++ components
+make go-build        # build Go components
+make cpp-test        # run C++ unit tests
+make static-analysis # run static analysis
+```
+
+## Configuration Examples
+
+```ini
+# configs/ternary_fission.conf
+parent_mass=235.0
+excitation_energy=6.5
+web_root=webroot
+media_streaming_enabled=false
+```
+
+## Environment Variables
+
+See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for default values, valid options, and usage examples.
+
+## Running the Daemon and Dashboard
+
+```bash
+# Run API daemon
+./bin/ternary-api -config configs/ternary_fission.conf &
+
+# Access web dashboard
+open http://localhost:8080
+```
 
 ## 📊 Current Development Status (v1.1.15-alpha)
 
@@ -33,23 +90,44 @@ High-performance ternary nuclear fission simulation with C++ physics engine, Go 
 - **Prometheus Metrics**: `http://localhost:8080/api/v1/metrics` - Performance monitoring
 - **API Documentation**: `http://localhost:8080/api/v1/` - REST API reference
 
+### Static Files and Media Streaming
+- **Static Files** (`web_root`): `http://localhost:8333/index.html` - Files served from the configurable web root
+- **Media Stream** (`media_root`): `http://localhost:8333/stream` - Icecast stream when `media_streaming_enabled` is true
+
+```bash
+curl http://localhost:8333/index.html      # Fetch static test page
+curl http://localhost:8333/stream          # Stream media content
+```
+
+### Web Dashboard Structure
+- **Atoms** (`web/atoms`): buttons, inputs, and shared styles
+- **Molecules** (`web/molecules`): login form and status cards
+- **Organisms** (`web/organisms`): navigation bar and metrics panel
+- **Templates** (`web/templates`): layout shells
+- **Pages** (`web/pages`): entry points `index.html` and `login.html`
+
+Set `web_root=webroot` so the C++ HTTP server serves the `webroot/` directory.
+Open `http://localhost:8333/login.html` to authenticate and reach the dashboard. The metrics panel polls `/api/v1/metrics` and management controls send commands such as `POST /api/v1/control/shutdown`.
+
 ### ⚠️ In Testing/Validation Phase
 - **WebSocket Monitoring**: Basic implementation, real-time validation ongoing
 - **Energy Field Management**: Core functionality present, comprehensive testing needed
 - **Cross-Platform Testing**: Ubuntu 24.04 verified, other distributions pending
 - **Performance Optimization**: Memory pool improvements and load testing required
+- **Media Streaming Control**: Start and stop Icecast streams via `/api/v1/stream/start` and `/api/v1/stream/stop`
 
 ### 🎯 Updated Release Timeline
 - **v1.1.25**: Complete API testing → **v1.2.1-beta** (Full feature completion)
 - **v1.2.100**: Performance optimization → **v1.3.1** Gold Release
 - **Current Focus**: Comprehensive API testing and Kubernetes integration
 
-## 📚 Documentation Links
+## Related Documentation
 
-- **[HOW-TO.md](HOW-TO.md)** - Complete usage guide with examples from basic to extreme simulations
-- **[TESTING.md](TESTING.md)** - Docker testing procedures and verification commands
-- **[NEXT-STEPS.md](NEXT-STEPS.md)** - Development roadmap and technical debt analysis
-- **[BUILD_CARRYOVER.md](BUILD_CARRYOVER.md)** - Development context and architecture overview
+- [HOW-TO.md](HOW-TO.md) - Complete usage guide with examples from basic to extreme simulations
+- [TESTING.md](TESTING.md) - Docker testing procedures and verification commands
+- [NEXT-STEPS.md](NEXT-STEPS.md) - Development roadmap and technical debt analysis
+- [BUILD_CARRYOVER.md](BUILD_CARRYOVER.md) - Development context and architecture overview
+- [RELEASE.md](RELEASE.md) - Commit impact summary
 
 ## 🚀 Quick Start
 
@@ -76,10 +154,19 @@ sudo apt update && sudo apt install -y \
   build-essential gcc-13 g++-13 cmake make \
   libssl-dev libcrypto++-dev libgsl-dev \
   libeigen3-dev libfftw3-dev libopenblas-dev \
-  liblapack-dev libboost-all-dev
+  liblapack-dev libboost-all-dev \
+  libhttplib-dev
+
+# macOS dependencies
+brew install jsoncpp openssl@3 cpp-httplib
 
 # Build all components
 make all
+
+# Build only C++ components
+make cpp-build
+
+# The cpp-httplib header is vendored under `third_party/cpp-httplib/httplib.h` if package managers are unavailable.
 
 # Run API server
 ./bin/ternary-api -config configs/ternary_fission.conf -port 8080
@@ -204,9 +291,15 @@ sudo nano /etc/ternary-fission/ternary_fission.conf
 
 # Key settings
 api_port=8080
-events_per_second=5.0  
+events_per_second=5.0
 max_energy_field=1000.0
 log_level=info
+```
+
+### SSL Certificate Management
+```bash
+# Generate a self-signed certificate for local testing
+./scripts/ssl-manager.sh --cn localhost --days 365
 ```
 
 ## 📊 API Documentation
@@ -290,8 +383,8 @@ curl -X POST http://localhost:8080/api/v1/energy-fields \
 ```bash
 # Available at http://localhost:8080/api/v1/metrics
 ternary_fission_api_requests_total
-ternary_fission_active_energy_fields
-ternary_fission_total_energy_mev
+reactor_active_fields
+reactor_total_energy_mev
 ternary_fission_api_response_time_seconds
 ```
 
@@ -386,7 +479,7 @@ make test-integration
 make clean && make all
 
 # Missing dependencies
-sudo apt install -y build-essential libssl-dev
+sudo apt install -y build-essential libssl-dev libhttplib-dev
 
 # Docker issues
 docker-compose down && docker-compose up --build

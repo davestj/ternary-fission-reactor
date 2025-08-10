@@ -37,6 +37,7 @@
 #include <thread>       // For threading
 #include <condition_variable> // For thread coordination
 #include <queue>        // For event queue
+#include <json/json.h>  // For JSON API responses
 
 #include "physics.constants.definitions.h"
 #include "physics.utilities.h"
@@ -84,6 +85,8 @@ public:
      * @return: Complete ternary fission event structure
      */
     TernaryFissionEvent simulateTernaryFissionEvent(double parent_mass, double excitation_energy);
+    TernaryFissionEvent simulateTernaryFissionEvent();
+    Json::Value simulateTernaryFissionEventAPI(const Json::Value& request);
 
     /**
      * Create an energy field with specified energy
@@ -93,6 +96,7 @@ public:
      * @return: Energy field structure
      */
     EnergyField createEnergyField(double energy_mev);
+    Json::Value createEnergyFieldAPI(const Json::Value& request);
 
     /**
      * Dissipate energy from an existing field
@@ -110,12 +114,36 @@ public:
      * @param events_per_second: Target simulation rate
      */
     void startContinuousSimulation(double events_per_second);
+    void stopContinuousSimulation();
 
     /**
-     * Stop continuous simulation
-     * We halt background generation and wait for completion
+     * Start a timed portal load at specified power level
+     * We create an energy field load that persists for the given duration
+     *
+     * @param duration_seconds: Duration of the load
+     * @param power_level_mev: Energy level in MeV
      */
-    void stopSimulation();
+    void startPortalLoad(double duration_seconds, double power_level_mev);
+
+    /**
+     * Store current portal event state
+     * We record timing and estimated power for status queries
+     */
+    void setPortalEventState(std::chrono::system_clock::time_point start,
+                             std::chrono::system_clock::time_point end,
+                             double estimated_power_mev);
+
+    /**
+     * Get current portal event state
+     * We provide estimated power and remaining duration
+     */
+    void getPortalEventState(double& estimated_power_mev,
+                             int& remaining_seconds) const;
+
+    Json::Value startContinuousSimulationAPI(const Json::Value& request);
+    Json::Value stopContinuousSimulationAPI();
+    Json::Value getSystemStatusAPI() const;
+    Json::Value getEnergyFieldsAPI() const;
 
     /**
      * Check if simulation is currently running
@@ -132,6 +160,10 @@ public:
      * @return: Current performance metrics
      */
     PerformanceMetrics getCurrentMetrics() const;
+
+    uint64_t getTotalEventsSimulated() const;
+    uint64_t getTotalEnergyFieldsCreated() const;
+    double getTotalComputationTimeSeconds() const;
 
     /**
      * Set number of worker threads
@@ -174,7 +206,7 @@ private:
     // We define private member variables for internal state
     int num_worker_threads;
     std::vector<std::thread> worker_threads;
-    std::thread continuous_generator_thread;
+    std::thread continuous_thread;
 
     // We use atomic counters for thread-safe statistics
     std::atomic<std::uint64_t> total_events_simulated;
@@ -191,10 +223,38 @@ private:
     mutable std::mutex state_mutex;
     SimulationState simulation_state;
 
+    // We provide thread-safe API request handling
+    mutable std::mutex api_mutex_;
+    std::uint64_t api_request_counter_;
+    bool json_serialization_enabled_;
+
     // We implement thread-safe event queue processing
     std::mutex queue_mutex;
     std::condition_variable queue_cv;
     std::queue<TernaryFissionEvent> event_queue;
+
+    // Portal event state tracking
+    std::chrono::system_clock::time_point portal_start_time_;
+    std::chrono::system_clock::time_point portal_end_time_;
+    double portal_estimated_power_mev_ = 0.0;
+
+    /**
+     * Serialize fission event to JSON
+     * We convert physics structures to API responses
+     *
+     * @param event: Event to serialize
+     * @return: JSON representation
+     */
+    Json::Value serializeFissionEventToJSON(const TernaryFissionEvent& event) const;
+
+    /**
+     * Serialize energy field to JSON
+     * We convert field data for API responses
+     *
+     * @param field: Energy field to serialize
+     * @return: JSON representation
+     */
+    Json::Value serializeEnergyFieldToJSON(const EnergyField& field) const;
 
     /**
      * Generate a ternary fission event (private method)

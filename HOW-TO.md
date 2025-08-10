@@ -18,6 +18,8 @@
 - Container orchestration tested with proper graceful shutdown capabilities
 - All examples updated to reflect current working configuration
 
+**Release Candidate:** v2.0.0-rc1 — see [ARCH.md](ARCH.md) for architecture and [NEXT-STEPS.md](NEXT-STEPS.md) for roadmap milestones
+
 ## 🚀 Quick Start (Docker - Recommended)
 
 ### Fastest Way to Get Started
@@ -52,6 +54,28 @@ curl http://localhost:8080/api/v1/metrics   # Prometheus metrics
 # Access web dashboard
 curl http://localhost:8080/                 # Educational interface
 ```
+
+### Static Files and Streaming
+`web_root` serves static assets while `media_root` provides optional streaming content.
+
+```bash
+curl http://localhost:8333/index.html     # Fetch static test page
+curl http://localhost:8333/stream         # Stream media content
+```
+
+## 🔧 Dependencies
+
+For native builds, install the header-only [cpp-httplib](https://github.com/yhirose/cpp-httplib) library:
+
+```bash
+# Debian/Ubuntu
+sudo apt-get install libhttplib-dev
+
+# macOS
+brew install cpp-httplib
+```
+
+The project also vendors the header at `third_party/cpp-httplib/httplib.h` if package installation isn't possible.
 
 ## 📊 Working API Endpoints (Verified)
 
@@ -505,6 +529,8 @@ docker-compose exec ternary-fission-app /app/bin/ternary-api -config /app/config
 ```
 
 ### Environment Variables
+
+See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for default values and available settings.
 ```bash
 # Set environment overrides for Docker
 export TERNARY_THREADS=32

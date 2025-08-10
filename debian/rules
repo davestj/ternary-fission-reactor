@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	$(MAKE) static
+
+override_dh_auto_install:
+	mkdir -p debian/ternary-fission-reactor/usr/bin
+	cp bin/ternary-fission-reactor debian/ternary-fission-reactor/usr/bin/
+
+override_dh_auto_clean:
+	$(MAKE) clean
