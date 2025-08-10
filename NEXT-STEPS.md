@@ -19,6 +19,8 @@
 - Testing framework ready for comprehensive validation of remaining components
 - Next major milestone: complete API testing and Kubernetes deployment
 
+**Release Candidate:** v2.0.0-rc1 — see [ARCH.md](ARCH.md) for design overview and [HOW-TO.md](HOW-TO.md) for operational guidance
+
 ## ✅ Major Achievements Since Last Update
 
 ### Infrastructure Victories

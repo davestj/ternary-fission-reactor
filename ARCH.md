@@ -6,6 +6,8 @@
 **Purpose:** Comprehensive architectural design decisions and implementation roadmap  
 **Reason:** Document strategic technical decisions for distributed physics simulation architecture
 
+**Release Candidate:** v2.0.0-rc1 — see [HOW-TO.md](HOW-TO.md) for usage guidance and [NEXT-STEPS.md](NEXT-STEPS.md) for roadmap context
+
 ## Project Vision and Strategic Direction
 
 The Ternary Fission Energy Emulation System represents a distributed computing architecture designed to simulate complex physics systems through specialized daemon processes. Our core innovation lies in mapping computational infrastructure directly to theoretical physics frameworks, creating a system where distributed computing mirrors distributed physics.
