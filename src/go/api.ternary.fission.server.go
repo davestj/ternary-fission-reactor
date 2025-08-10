@@ -1910,8 +1910,11 @@ func (s *TernaryFissionAPIServer) triggerPortalSimulation(w http.ResponseWriter,
         s.writeErrorResponse(w, http.StatusBadRequest, "Invalid request body")
         return
     }
-    if req.DurationSeconds <= 0 {
+    if req.DurationSeconds == 0 {
         req.DurationSeconds = 900
+    } else if req.DurationSeconds < 0 {
+        s.writeErrorResponse(w, http.StatusBadRequest, "Duration must be non-negative")
+        return
     }
 
     body, err := json.Marshal(req)
@@ -1920,7 +1923,8 @@ func (s *TernaryFissionAPIServer) triggerPortalSimulation(w http.ResponseWriter,
         return
     }
 
-    reactorReq, err := http.NewRequest(http.MethodPut, fmt.Sprintf("%s/api/v1/portal/trigger", s.config.ReactorBaseURL), bytes.NewReader(body))
+    reactorURL := s.config.ReactorBaseURL + "/api/v1/portal/trigger"
+    reactorReq, err := http.NewRequest(http.MethodPut, reactorURL, bytes.NewReader(body))
     if err != nil {
         s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to build reactor request")
         return
@@ -1936,7 +1940,9 @@ func (s *TernaryFissionAPIServer) triggerPortalSimulation(w http.ResponseWriter,
 
     w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
     w.WriteHeader(resp.StatusCode)
-    io.Copy(w, resp.Body)
+    if _, err := io.Copy(w, resp.Body); err != nil {
+        log.Printf("Failed to forward reactor response: %v", err)
+    }
 }
 
 // =============================================================================
