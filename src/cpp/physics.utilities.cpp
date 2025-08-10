@@ -85,6 +85,13 @@ static std::ofstream daemon_log_file_;
 static std::atomic<bool> daemon_logging_enabled_{false};
 static std::string daemon_log_file_path_;
 
+// We generate unique field identifiers
+static std::atomic<std::uint64_t> field_id_counter_{1};
+
+std::uint64_t generateFieldId() {
+    return field_id_counter_.fetch_add(1, std::memory_order_relaxed);
+}
+
 /*
  * HTTP API: Convert energy field to JSON representation
  * We provide complete JSON serialization for HTTP API responses
