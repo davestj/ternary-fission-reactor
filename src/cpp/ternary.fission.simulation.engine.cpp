@@ -288,7 +288,7 @@ Json::Value TernaryFissionSimulationEngine::getEnergyFieldsAPI() const {
     Json::Value fields_array(Json::arrayValue);
 
     for (const auto& field : simulation_state.active_energy_fields) {
-        fields_array.append(serializeEnergyFieldToJSON(*field));
+        fields_array.append(serializeEnergyFieldToJSON(field));
     }
 
     response["energy_fields"] = fields_array;
@@ -363,7 +363,7 @@ Json::Value TernaryFissionSimulationEngine::createEnergyFieldAPI(const Json::Val
         Json::Value response;
         response["status"] = "success";
         response["message"] = "Energy field created successfully";
-        response["energy_field"] = serializeEnergyFieldToJSON(*field);
+        response["energy_field"] = serializeEnergyFieldToJSON(field);
 
         return response;
 
@@ -727,7 +727,7 @@ void TernaryFissionSimulationEngine::processFissionEvent(const TernaryFissionEve
     // Create energy field based on event
     try {
         auto energy_field = createEnergyField(event.total_kinetic_energy);
-        energy_field->field_id = event.energy_field_id;
+        energy_field.field_id = event.energy_field_id;
 
         {
             std::lock_guard<std::mutex> lock(state_mutex);
@@ -821,10 +821,10 @@ void TernaryFissionSimulationEngine::updateEnergyFields() {
     auto it = simulation_state.active_energy_fields.begin();
     while (it != simulation_state.active_energy_fields.end()) {
         // Apply dissipation using physics utilities
-        ::TernaryFission::dissipateEnergyField(**it);
+        ::TernaryFission::dissipateEnergyField(*it);
 
         // Remove fields with very low energy
-        if ((*it)->energy_mev < 0.001) {
+        if (it->energy_mev < 0.001) {
             it = simulation_state.active_energy_fields.erase(it);
         } else {
             ++it;
