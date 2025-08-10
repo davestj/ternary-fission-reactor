@@ -31,6 +31,7 @@
 #include "config.ternary.fission.server.h"
 #include "physics.constants.definitions.h"
 #include "ternary.fission.simulation.engine.h"
+#include "media.streaming.h"
 #include <httplib.h>
 #include <json/json.h>
 #include <string>
@@ -154,6 +155,9 @@ private:
 #endif
     std::shared_ptr<TernaryFissionSimulationEngine> simulation_engine_; // Physics engine
     std::mutex simulation_mutex_;                // Simulation state synchronization
+
+    // We manage external media streaming process
+    std::unique_ptr<MediaStreamingManager> media_streaming_manager_;
     
     // We maintain server state and configuration
     std::string bind_ip_;                       // Network binding IP address
@@ -197,6 +201,8 @@ private:
     void handleSimulationStart(const httplib::Request& req, httplib::Response& res); // Start simulation
     void handleSimulationStop(const httplib::Request& req, httplib::Response& res); // Stop simulation
     void handleSimulationReset(const httplib::Request& req, httplib::Response& res); // Reset simulation
+    void handleStreamStart(const httplib::Request& req, httplib::Response& res); // Start media streaming
+    void handleStreamStop(const httplib::Request& req, httplib::Response& res);  // Stop media streaming
     void handleFissionCalculation(const httplib::Request& req, httplib::Response& res); // Fission calc
     void handleConservationLaws(const httplib::Request& req, httplib::Response& res); // Conservation check
     void handleEnergyGeneration(const httplib::Request& req, httplib::Response& res); // Energy generation

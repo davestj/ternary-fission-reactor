@@ -38,6 +38,7 @@ High-performance ternary nuclear fission simulation with C++ physics engine, Go 
 - **Energy Field Management**: Core functionality present, comprehensive testing needed
 - **Cross-Platform Testing**: Ubuntu 24.04 verified, other distributions pending
 - **Performance Optimization**: Memory pool improvements and load testing required
+- **Media Streaming Control**: Start and stop Icecast streams via `/api/v1/stream/start` and `/api/v1/stream/stop`
 
 ### 🎯 Updated Release Timeline
 - **v1.1.25**: Complete API testing → **v1.2.1-beta** (Full feature completion)
