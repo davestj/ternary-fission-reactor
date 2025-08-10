@@ -3,7 +3,7 @@
 # Author: David St. John (davestj@gmail.com)
 # Date: 2025-07-31
 # Purpose: Complete solution for Ternary Fission Reactor build environment
-# Version: 1.1.13
+# Version: 2.0.0-rc1
 #
 # Change Log:
 # - 2025-07-31: Complete build environment setup with dependency resolution
@@ -361,7 +361,7 @@ create_debian_files() {
     
     # Create changelog
     cat > debian/changelog << EOF
-ternary-fission-reactor (1.1.13-1) unstable; urgency=medium
+ternary-fission-reactor (2.0.0-rc1-1) unstable; urgency=medium
 
   * Initial Debian package release
   * Added JsonCpp and OpenSSL integration

@@ -29,7 +29,7 @@ set -e
 
 # We define script metadata and version information
 SCRIPT_NAME="docker-build.sh"
-SCRIPT_VERSION="1.1.13"
+SCRIPT_VERSION="2.0.0-rc1"
 SCRIPT_AUTHOR="bthlops (David StJ)"
 
 # We set up build configuration

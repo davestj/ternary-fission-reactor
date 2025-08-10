@@ -253,7 +253,7 @@ std::string formatHTTPResponse(const std::string& status, const std::string& mes
     timestamp_ss << std::put_time(std::gmtime(&time_t), "%Y-%m-%dT%H:%M:%SZ");
     response["timestamp"] = timestamp_ss.str();
 
-    response["api_version"] = "1.1.13";
+    response["api_version"] = "2.0.0-rc1";
     response["server"] = "ternary-fission-daemon";
 
     Json::StreamWriterBuilder builder;

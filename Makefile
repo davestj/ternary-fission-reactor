@@ -18,7 +18,7 @@
 # PROJECT METADATA
 # =============================================================================
 PROJECT_NAME := ternary-fission-reactor
-VERSION := 1.1.13
+VERSION := 2.0.0-rc1
 BUILD_DATE := $(shell date -u +"%Y-%m-%d_%H:%M:%S_UTC")
 GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 

@@ -1,4 +1,4 @@
-ternary-fission-reactor (1.1.13-1) unstable; urgency=medium
+ternary-fission-reactor (2.0.0-rc1-1) unstable; urgency=medium
 
   * Initial Debian package release
   * Added JsonCpp and OpenSSL integration
