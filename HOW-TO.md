@@ -11,6 +11,7 @@
 - 2025-07-31: Added Docker testing procedures and container-based workflows
 - 2025-07-31: Confirmed web dashboard access and REST API functionality
 - 2025-07-31: Updated port configurations to reflect actual runtime behavior
+- 2025-07-31: Added clustering setup instructions with eight-node ring topology and daemon.config samples
 
 **Carry-over Context:**
 - Docker deployment now fully functional with multi-stage builds working correctly
@@ -515,6 +516,92 @@ kubectl create job ternary-sim --image=ternary-fission \
 kubectl create deployment ternary-api --image=ternary-fission \
   -- ./ternary-api -config /config/production.conf
 ```
+
+
+## 🤝 Clustering & Load Balancing
+
+Follow these steps to form an eight-node ring cluster.
+
+1. Provision eight machines with static addresses `10.0.0.10` through `10.0.0.17`.
+2. On each machine, copy `configs/daemon.config` and edit the fragment shown below.
+3. Start the daemon: `./bin/ternary-daemon -config daemon.config`.
+4. Verify cluster health using `curl http://<node>:8333/api/v1/health`.
+
+### Sample `daemon.config` fragments
+
+**node0**
+```ini
+node_id = 0
+bind_ip = 10.0.0.10
+ring_prev = 10.0.0.17
+ring_next = 10.0.0.11
+shards = 0
+```
+
+**node1**
+```ini
+node_id = 1
+bind_ip = 10.0.0.11
+ring_prev = 10.0.0.10
+ring_next = 10.0.0.12
+shards = 1
+```
+
+**node2**
+```ini
+node_id = 2
+bind_ip = 10.0.0.12
+ring_prev = 10.0.0.11
+ring_next = 10.0.0.13
+shards = 2
+```
+
+**node3**
+```ini
+node_id = 3
+bind_ip = 10.0.0.13
+ring_prev = 10.0.0.12
+ring_next = 10.0.0.14
+shards = 3
+```
+
+**node4**
+```ini
+node_id = 4
+bind_ip = 10.0.0.14
+ring_prev = 10.0.0.13
+ring_next = 10.0.0.15
+shards = 4
+```
+
+**node5**
+```ini
+node_id = 5
+bind_ip = 10.0.0.15
+ring_prev = 10.0.0.14
+ring_next = 10.0.0.16
+shards = 5
+```
+
+**node6**
+```ini
+node_id = 6
+bind_ip = 10.0.0.16
+ring_prev = 10.0.0.15
+ring_next = 10.0.0.17
+shards = 6
+```
+
+**node7**
+```ini
+node_id = 7
+bind_ip = 10.0.0.17
+ring_prev = 10.0.0.16
+ring_next = 10.0.0.10
+shards = 7
+```
+
+Each node owns its shard and monitors its predecessor. If a node fails, the successor loads the missing shard and propagates the change around the ring to rebalance once the node recovers.
 
 ## ⚙️ Advanced Configuration
 
