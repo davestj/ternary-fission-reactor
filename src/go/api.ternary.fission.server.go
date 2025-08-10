@@ -26,28 +26,28 @@
 package main
 
 import (
-    "bufio"
-    "bytes"
-    "context"
-    "encoding/json"
-    "flag"
-    "fmt"
-    "html/template"
-    "io"
-    "log"
-    "net/http"
-    "os"
-    "os/signal"
-    "strconv"
-    "strings"
-    "sync"
-    "syscall"
-    "time"
+	"bufio"
+	"bytes"
+	"context"
+	"encoding/json"
+	"flag"
+	"fmt"
+	"html/template"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"strconv"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
 
-    "github.com/gorilla/mux"
-    "github.com/gorilla/websocket"
-    "github.com/prometheus/client_golang/prometheus"
-    "github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // =============================================================================
@@ -56,13 +56,13 @@ import (
 
 // We define the configuration structure to hold all settings
 type Config struct {
-        // API Server settings
-        APIPort                  int    `config:"api_port"`
-        APIHost                  string `config:"api_host"`
-        APITimeout               int    `config:"api_timeout"`
-        MaxRequestSize           int64  `config:"max_request_size"`
-        MaxConcurrentConnections int    `config:"max_concurrent_connections"`
-        ReactorBaseURL           string `config:"reactor_base_url"`
+	// API Server settings
+	APIPort                  int    `config:"api_port"`
+	APIHost                  string `config:"api_host"`
+	APITimeout               int    `config:"api_timeout"`
+	MaxRequestSize           int64  `config:"max_request_size"`
+	MaxConcurrentConnections int    `config:"max_concurrent_connections"`
+	ReactorBaseURL           string `config:"reactor_base_url"`
 
 	// WebSocket settings
 	WebSocketEnabled      bool `config:"websocket_enabled"`
@@ -88,27 +88,27 @@ type Config struct {
 
 // We provide default configuration values with port 8238
 func defaultConfig() *Config {
-        return &Config{
-                APIPort:                  8238,
-                APIHost:                  "0.0.0.0",
-                APITimeout:               30,
-                MaxRequestSize:           10485760,
-                MaxConcurrentConnections: 1000,
-                ReactorBaseURL:           "http://localhost:8333",
-                WebSocketEnabled:         true,
-                WebSocketBufferSize:      4096,
-                WebSocketTimeout:         300,
-                WebSocketPingInterval:    30,
-                ParentMass:               235.0,
-                ExcitationEnergy:         6.5,
-                EventsPerSecond:          5.0,
-                MaxEnergyField:           1000.0,
-                LogLevel:                 "info",
-                VerboseOutput:            false,
-                PrometheusEnabled:        true,
-                CORSEnabled:              true,
-                RateLimitingEnabled:      true,
-        }
+	return &Config{
+		APIPort:                  8238,
+		APIHost:                  "0.0.0.0",
+		APITimeout:               30,
+		MaxRequestSize:           10485760,
+		MaxConcurrentConnections: 1000,
+		ReactorBaseURL:           "http://localhost:8333",
+		WebSocketEnabled:         true,
+		WebSocketBufferSize:      4096,
+		WebSocketTimeout:         300,
+		WebSocketPingInterval:    30,
+		ParentMass:               235.0,
+		ExcitationEnergy:         6.5,
+		EventsPerSecond:          5.0,
+		MaxEnergyField:           1000.0,
+		LogLevel:                 "info",
+		VerboseOutput:            false,
+		PrometheusEnabled:        true,
+		CORSEnabled:              true,
+		RateLimitingEnabled:      true,
+	}
 }
 
 // We parse configuration file with proper inline comment handling and whitespace trimming
@@ -153,19 +153,19 @@ func parseConfigFile(filename string) (*Config, error) {
 		}
 
 		// We set configuration values based on key
-                switch key {
-                case "api_port":
-                        if port, err := strconv.Atoi(value); err == nil {
-                                config.APIPort = port
-                        }
-                case "api_host":
-                        config.APIHost = value
-                case "reactor_base_url":
-                        config.ReactorBaseURL = value
-                case "events_per_second":
-                        if eps, err := strconv.ParseFloat(value, 64); err == nil {
-                                config.EventsPerSecond = eps
-                        }
+		switch key {
+		case "api_port":
+			if port, err := strconv.Atoi(value); err == nil {
+				config.APIPort = port
+			}
+		case "api_host":
+			config.APIHost = value
+		case "reactor_base_url":
+			config.ReactorBaseURL = value
+		case "events_per_second":
+			if eps, err := strconv.ParseFloat(value, 64); err == nil {
+				config.EventsPerSecond = eps
+			}
 		case "parent_mass":
 			if mass, err := strconv.ParseFloat(value, 64); err == nil {
 				config.ParentMass = mass
@@ -245,43 +245,43 @@ type SystemStatusResponse struct {
 
 // We implement the main API server structure
 type TernaryFissionAPIServer struct {
-        config            *Config
-        server            *http.Server
-        router            *mux.Router
-        websocketUpgrader websocket.Upgrader
-        activeConnections map[string]*websocket.Conn
-        connectionsMutex  sync.RWMutex
-        startTime         time.Time
+	config            *Config
+	server            *http.Server
+	router            *mux.Router
+	websocketUpgrader websocket.Upgrader
+	activeConnections map[string]*websocket.Conn
+	connectionsMutex  sync.RWMutex
+	startTime         time.Time
 
-        // Performance metrics
-        requestCounter    *prometheus.CounterVec
-        responseTime      *prometheus.HistogramVec
-        activeFieldsGauge prometheus.Gauge
-        energyTotalGauge  prometheus.Gauge
+	// Performance metrics
+	requestCounter    *prometheus.CounterVec
+	responseTime      *prometheus.HistogramVec
+	activeFieldsGauge prometheus.Gauge
+	energyTotalGauge  prometheus.Gauge
 
-        // Reactor communication
-        reactorClient *http.Client
+	// Reactor communication
+	reactorClient *http.Client
 
-        // System control
-        shutdownChan chan os.Signal
-        ctx          context.Context
-        cancelFunc   context.CancelFunc
+	// System control
+	shutdownChan chan os.Signal
+	ctx          context.Context
+	cancelFunc   context.CancelFunc
 }
 
 // We initialize the API server with configuration
 func NewTernaryFissionAPIServer(config *Config) *TernaryFissionAPIServer {
-        ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
-        server := &TernaryFissionAPIServer{
-                config:            config,
-                router:            mux.NewRouter(),
-                activeConnections: make(map[string]*websocket.Conn),
-                reactorClient:     &http.Client{Timeout: time.Duration(config.APITimeout) * time.Second},
-                shutdownChan:      make(chan os.Signal, 1),
-                ctx:               ctx,
-                cancelFunc:        cancel,
-                startTime:         time.Now(),
-        }
+	server := &TernaryFissionAPIServer{
+		config:            config,
+		router:            mux.NewRouter(),
+		activeConnections: make(map[string]*websocket.Conn),
+		reactorClient:     &http.Client{Timeout: time.Duration(config.APITimeout) * time.Second},
+		shutdownChan:      make(chan os.Signal, 1),
+		ctx:               ctx,
+		cancelFunc:        cancel,
+		startTime:         time.Now(),
+	}
 
 	// We configure WebSocket upgrader with proper settings
 	server.websocketUpgrader = websocket.Upgrader{
@@ -1010,6 +1010,13 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
                 </div>
 
                 <div class="endpoint">
+                    <span class="endpoint-method method-post">POST</span>
+                    <span class="endpoint-url">/api/v1/energy-fields/{id}/dissipate</span>
+                    <div class="endpoint-desc">Dissipate existing energy field through encryption rounds</div>
+                    <button class="test-button" onclick="dissipateWithId()">🧪 Test</button>
+                </div>
+
+                <div class="endpoint">
                     <span class="endpoint-method method-get">GET</span>
                     <span class="endpoint-url">/api/v1/metrics</span>
                     <div class="endpoint-desc">Prometheus-compatible metrics for monitoring and alerting systems</div>
@@ -1245,6 +1252,37 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
             }
         }
 
+        // We dissipate energy fields by ID with configurable rounds
+        function dissipateWithId() {
+            const id = prompt('Enter energy-fields ID to dissipate:');
+            if (id) {
+                const roundsInput = prompt('Enter dissipation rounds:', '1');
+                const rounds = roundsInput ? parseInt(roundsInput) : 0;
+                const payload = rounds > 0 ? { dissipation_rounds: rounds } : {};
+
+                fetch('/api/v1/energy-fields/' + id + '/dissipate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('✅ Dissipation successful:', data);
+                        alert('✅ Dissipation Successful!\n\n' + JSON.stringify(data, null, 2));
+                        updateSystemStatus();
+                    })
+                    .catch(error => {
+                        console.error('❌ Dissipation failed:', error);
+                        alert('❌ Dissipation Failed!\n\nError: ' + error.message);
+                    });
+            }
+        }
+
         // We show create form
         function showCreateForm() {
             document.querySelector('.field-creator').scrollIntoView({ behavior: 'smooth' });
@@ -1374,165 +1412,201 @@ func (s *TernaryFissionAPIServer) serveDashboard(w http.ResponseWriter, r *http.
 
 // We implement the energy field creation endpoint
 func (s *TernaryFissionAPIServer) createEnergyField(w http.ResponseWriter, r *http.Request) {
-        body, err := io.ReadAll(r.Body)
-        if err != nil {
-                s.writeErrorResponse(w, http.StatusBadRequest, "Invalid request body")
-                return
-        }
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
 
-        req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v1/energy-fields", s.config.ReactorBaseURL), bytes.NewReader(body))
-        if err != nil {
-                s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to build reactor request")
-                return
-        }
-        req.Header.Set("Content-Type", "application/json")
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v1/energy-fields", s.config.ReactorBaseURL), bytes.NewReader(body))
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to build reactor request")
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
 
-        resp, err := s.reactorClient.Do(req)
-        if err != nil {
-                s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
-                return
-        }
-        defer resp.Body.Close()
+	resp, err := s.reactorClient.Do(req)
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+		return
+	}
+	defer resp.Body.Close()
 
-        w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-        w.WriteHeader(resp.StatusCode)
-        io.Copy(w, resp.Body)
+	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
 }
 
 // We implement the system status endpoint
 func (s *TernaryFissionAPIServer) getSystemStatus(w http.ResponseWriter, r *http.Request) {
-        resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/status", s.config.ReactorBaseURL))
-        if err != nil {
-                s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
-                return
-        }
-        defer resp.Body.Close()
+	resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/status", s.config.ReactorBaseURL))
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+		return
+	}
+	defer resp.Body.Close()
 
-        if resp.StatusCode != http.StatusOK {
-                body, _ := io.ReadAll(resp.Body)
-                s.writeErrorResponse(w, resp.StatusCode, string(body))
-                return
-        }
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		s.writeErrorResponse(w, resp.StatusCode, string(body))
+		return
+	}
 
-        var status SystemStatusResponse
-        if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-                s.writeErrorResponse(w, http.StatusInternalServerError, "Invalid reactor response")
-                return
-        }
+	var status SystemStatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		s.writeErrorResponse(w, http.StatusInternalServerError, "Invalid reactor response")
+		return
+	}
 
-        if s.config.PrometheusEnabled {
-                s.activeFieldsGauge.Set(float64(status.ActiveEnergyFields))
-                s.energyTotalGauge.Set(status.TotalEnergySimulated)
-        }
+	if s.config.PrometheusEnabled {
+		s.activeFieldsGauge.Set(float64(status.ActiveEnergyFields))
+		s.energyTotalGauge.Set(status.TotalEnergySimulated)
+	}
 
-        s.writeJSONResponse(w, http.StatusOK, status)
+	s.writeJSONResponse(w, http.StatusOK, status)
 }
 
 // We list all energy fields
 func (s *TernaryFissionAPIServer) listEnergyFields(w http.ResponseWriter, r *http.Request) {
-        resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/energy-fields", s.config.ReactorBaseURL))
-        if err != nil {
-                s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
-                return
-        }
-        defer resp.Body.Close()
+	resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/energy-fields", s.config.ReactorBaseURL))
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+		return
+	}
+	defer resp.Body.Close()
 
-        w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-        w.WriteHeader(resp.StatusCode)
-        io.Copy(w, resp.Body)
+	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
 }
 
 // We get a specific energy field
 func (s *TernaryFissionAPIServer) getEnergyField(w http.ResponseWriter, r *http.Request) {
-        pathParts := strings.Split(r.URL.Path, "/")
-        if len(pathParts) < 4 {
-                s.writeErrorResponse(w, http.StatusBadRequest, "Invalid field ID")
-                return
-        }
-        fieldID := pathParts[len(pathParts)-1]
+	pathParts := strings.Split(r.URL.Path, "/")
+	if len(pathParts) < 4 {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid field ID")
+		return
+	}
+	fieldID := pathParts[len(pathParts)-1]
 
-        resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/energy-fields/%s", s.config.ReactorBaseURL, fieldID))
-        if err != nil {
-                s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
-                return
-        }
-        defer resp.Body.Close()
+	resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/energy-fields/%s", s.config.ReactorBaseURL, fieldID))
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+		return
+	}
+	defer resp.Body.Close()
 
-        w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-        w.WriteHeader(resp.StatusCode)
-        io.Copy(w, resp.Body)
+	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
 }
 
 // We delete an energy field
 func (s *TernaryFissionAPIServer) deleteEnergyField(w http.ResponseWriter, r *http.Request) {
-        pathParts := strings.Split(r.URL.Path, "/")
-        if len(pathParts) < 4 {
-                s.writeErrorResponse(w, http.StatusBadRequest, "Invalid field ID")
-                return
-        }
-        fieldID := pathParts[len(pathParts)-1]
+	pathParts := strings.Split(r.URL.Path, "/")
+	if len(pathParts) < 4 {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid field ID")
+		return
+	}
+	fieldID := pathParts[len(pathParts)-1]
 
-        req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/api/v1/energy-fields/%s", s.config.ReactorBaseURL, fieldID), nil)
-        if err != nil {
-                s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to build reactor request")
-                return
-        }
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/api/v1/energy-fields/%s", s.config.ReactorBaseURL, fieldID), nil)
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to build reactor request")
+		return
+	}
 
-        resp, err := s.reactorClient.Do(req)
-        if err != nil {
-                s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
-                return
-        }
-        defer resp.Body.Close()
+	resp, err := s.reactorClient.Do(req)
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+		return
+	}
+	defer resp.Body.Close()
 
-        w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-        w.WriteHeader(resp.StatusCode)
-        io.Copy(w, resp.Body)
+	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
 }
 
 // We handle WebSocket connections for real-time monitoring
 func (s *TernaryFissionAPIServer) handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
-        conn, err := s.websocketUpgrader.Upgrade(w, r, nil)
-        if err != nil {
-                log.Printf("WebSocket upgrade failed: %v", err)
-                return
-        }
-        defer conn.Close()
+	conn, err := s.websocketUpgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("WebSocket upgrade failed: %v", err)
+		return
+	}
+	defer conn.Close()
 
-        log.Printf("WebSocket client connected: %s", r.RemoteAddr)
+	log.Printf("WebSocket client connected: %s", r.RemoteAddr)
 
-        ticker := time.NewTicker(time.Duration(s.config.WebSocketPingInterval) * time.Second)
-        defer ticker.Stop()
+	ticker := time.NewTicker(time.Duration(s.config.WebSocketPingInterval) * time.Second)
+	defer ticker.Stop()
 
-        for {
-                select {
-                case <-ticker.C:
-                        resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/status", s.config.ReactorBaseURL))
-                        if err != nil {
-                                log.Printf("WebSocket status fetch failed: %v", err)
-                                return
-                        }
-                        var status SystemStatusResponse
-                        if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-                                resp.Body.Close()
-                                log.Printf("WebSocket status decode failed: %v", err)
-                                return
-                        }
-                        resp.Body.Close()
+	for {
+		select {
+		case <-ticker.C:
+			resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/status", s.config.ReactorBaseURL))
+			if err != nil {
+				log.Printf("WebSocket status fetch failed: %v", err)
+				return
+			}
+			var status SystemStatusResponse
+			if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+				resp.Body.Close()
+				log.Printf("WebSocket status decode failed: %v", err)
+				return
+			}
+			resp.Body.Close()
 
-                        if err := conn.WriteJSON(status); err != nil {
-                                log.Printf("WebSocket write failed: %v", err)
-                                return
-                        }
-                case <-s.ctx.Done():
-                        return
-                }
-        }
+			if err := conn.WriteJSON(status); err != nil {
+				log.Printf("WebSocket write failed: %v", err)
+				return
+			}
+		case <-s.ctx.Done():
+			return
+		}
+	}
 }
 
-// Placeholder methods with enhanced functionality
+// We dissipate an energy field by forwarding the request to the reactor
 func (s *TernaryFissionAPIServer) dissipateEnergyField(w http.ResponseWriter, r *http.Request) {
-        s.writeErrorResponse(w, http.StatusNotImplemented, "Energy field dissipation feature coming soon - will integrate with C++ physics engine")
+	if r.Method != http.MethodPost && r.Method != http.MethodPut {
+		s.writeErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed - use POST or PUT")
+		return
+	}
+
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 5 {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid field ID")
+		return
+	}
+	fieldID := parts[len(parts)-2]
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	req, err := http.NewRequest(r.Method, fmt.Sprintf("%s/api/v1/energy-fields/%s/dissipate", s.config.ReactorBaseURL, fieldID), bytes.NewReader(body))
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to build reactor request")
+		return
+	}
+	if len(body) > 0 {
+		req.Header.Set("Content-Type", r.Header.Get("Content-Type"))
+	}
+
+	resp, err := s.reactorClient.Do(req)
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+		return
+	}
+	defer resp.Body.Close()
+
+	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
 }
 
 // =============================================================================
@@ -1595,29 +1669,29 @@ func (s *TernaryFissionAPIServer) corsMiddleware(next http.Handler) http.Handler
 }
 
 func (s *TernaryFissionAPIServer) healthCheck(w http.ResponseWriter, r *http.Request) {
-        uptime := time.Since(s.startTime)
+	uptime := time.Since(s.startTime)
 
-        resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/status", s.config.ReactorBaseURL))
-        if err != nil {
-                s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
-                return
-        }
-        var status SystemStatusResponse
-        if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-                resp.Body.Close()
-                s.writeErrorResponse(w, http.StatusInternalServerError, "Invalid reactor response")
-                return
-        }
-        resp.Body.Close()
+	resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/status", s.config.ReactorBaseURL))
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+		return
+	}
+	var status SystemStatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		resp.Body.Close()
+		s.writeErrorResponse(w, http.StatusInternalServerError, "Invalid reactor response")
+		return
+	}
+	resp.Body.Close()
 
-        health := map[string]interface{}{
-                "status":               "healthy",
-                "timestamp":            time.Now().Format(time.RFC3339),
-                "uptime_seconds":       int64(uptime.Seconds()),
-                "active_energy_fields": status.ActiveEnergyFields,
-        }
+	health := map[string]interface{}{
+		"status":               "healthy",
+		"timestamp":            time.Now().Format(time.RFC3339),
+		"uptime_seconds":       int64(uptime.Seconds()),
+		"active_energy_fields": status.ActiveEnergyFields,
+	}
 
-        s.writeJSONResponse(w, http.StatusOK, health)
+	s.writeJSONResponse(w, http.StatusOK, health)
 }
 
 // We start the API server
