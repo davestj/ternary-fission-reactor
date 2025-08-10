@@ -872,4 +872,35 @@ std::chrono::system_clock::time_point ConfigurationManager::getFileModificationT
     return std::chrono::system_clock::time_point::min();
 }
 
+std::vector<std::string> ConfigurationManager::getConfigStringList(const std::string& key) const {
+    std::vector<std::string> values;
+    std::string raw = getConfigValue(key, "");
+    if (raw.empty()) {
+        return values;
+    }
+
+    std::stringstream ss(raw);
+    std::string item;
+    while (std::getline(ss, item, ',')) {
+        values.push_back(item);
+    }
+    return values;
+}
+
+bool ConfigurationManager::validateCertificateFile(const std::string& cert_path) {
+    return fileExists(cert_path) && isFileReadable(cert_path);
+}
+
+bool ConfigurationManager::validatePrivateKeyFile(const std::string& key_path) {
+    return fileExists(key_path) && isFileReadable(key_path);
+}
+
+bool ConfigurationManager::validateCAFile(const std::string& ca_path) {
+    return fileExists(ca_path) && isFileReadable(ca_path);
+}
+
+std::chrono::system_clock::time_point ConfigurationManager::extractCertificateExpiry(const std::string& /*cert_path*/) {
+    return std::chrono::system_clock::now();
+}
+
 } // namespace TernaryFission
