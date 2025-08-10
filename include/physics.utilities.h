@@ -408,6 +408,17 @@ double normalRandom(double mean = 0.0, double stddev = 1.0);
  */
 int poissonRandom(double lambda);
 
+/*
+ * Estimate total power consumption for a portal event
+ * We extend the event duration proportionally to additional power
+ *
+ * @param power_level_mev: Base power level in MeV
+ * @param duration_seconds: Initial duration in seconds
+ * @param additional_power: Additional power applied in MeV
+ * @return: Projected total power usage in MeV
+ */
+double calculateEstimatedPower(double power_level_mev, int duration_seconds, double additional_power);
+
 } // namespace TernaryFission
 
 #endif // TERNARY_FISSION_PHYSICS_UTILITIES_H

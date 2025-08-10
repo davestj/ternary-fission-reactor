@@ -72,6 +72,8 @@ func TestGetSystemStatusParsesResponse(t *testing.T) {
         SimulationRunning:    true,
         CPUUsagePercent:      0.7,
         MemoryUsagePercent:   0.2,
+        EstimatedPower:       0,
+        PortalDurationRemain: 0,
     }
 
     stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

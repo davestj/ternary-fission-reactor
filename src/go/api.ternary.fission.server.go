@@ -244,12 +244,14 @@ type SystemStatusResponse struct {
 	TotalFissionEvents   uint64  `json:"total_fission_events"`
 	TotalEnergySimulated float64 `json:"total_energy_simulated_mev"`
 	ActiveEnergyFields   int     `json:"active_energy_fields"`
-	PeakMemoryUsage      uint64  `json:"peak_memory_usage_bytes"`
-	AverageCalcTime      float64 `json:"average_calculation_time_microseconds"`
-	TotalCalculations    uint64  `json:"total_calculations"`
-	SimulationRunning    bool    `json:"simulation_running"`
-	CPUUsagePercent      float64 `json:"cpu_usage_percent"`
-	MemoryUsagePercent   float64 `json:"memory_usage_percent"`
+        PeakMemoryUsage      uint64  `json:"peak_memory_usage_bytes"`
+        AverageCalcTime      float64 `json:"average_calculation_time_microseconds"`
+        TotalCalculations    uint64  `json:"total_calculations"`
+        SimulationRunning    bool    `json:"simulation_running"`
+        CPUUsagePercent      float64 `json:"cpu_usage_percent"`
+        MemoryUsagePercent   float64 `json:"memory_usage_percent"`
+        EstimatedPower       float64 `json:"estimated_power_mev"`
+        PortalDurationRemain int     `json:"portal_duration_remaining_seconds"`
 }
 
 // =============================================================================

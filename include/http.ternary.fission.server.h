@@ -101,6 +101,8 @@ struct SystemStatusResponse {
     bool simulation_running = false;            // Simulation engine status
     double cpu_usage_percent = 0.0;            // Current CPU usage percentage
     double memory_usage_percent = 0.0;         // Current memory usage percentage
+    double estimated_power_mev = 0.0;          // Estimated portal power usage
+    int portal_duration_remaining_seconds = 0; // Remaining portal duration
     
     // We provide JSON serialization method
     Json::Value toJson() const;
