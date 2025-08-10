@@ -543,6 +543,24 @@ export TERNARY_LOG_LEVEL=debug
 ./ternary-fission -n 50000
 ```
 
+## 🏁 Benchmarking
+
+See [docs/BENCHMARKING.md](docs/BENCHMARKING.md) for preset definitions.
+
+```bash
+# Small
+./ternary-fission --preset small
+
+# Medium
+./ternary-fission --preset medium
+
+# Large
+./ternary-fission --preset large
+
+# Extra Large
+./ternary-fission --preset xlarge
+```
+
 ## ✅ Validation and Verification
 
 ### Conservation Law Checking

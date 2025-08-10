@@ -25,7 +25,7 @@ The system emulates ternary nuclear fission to explore how computational resourc
 - Distributed daemon architecture bridging C++ and Go components
 - Docker-first deployment with real-time monitoring stack
 - Kubernetes-ready configuration and release workflows
-- See [ARCH.md](ARCH.md), [HOW-TO.md](HOW-TO.md), and [NEXT-STEPS.md](NEXT-STEPS.md) for RC milestone details
+- See [ARCH.md](ARCH.md), [HOW-TO.md](HOW-TO.md), [docs/BENCHMARKING.md](docs/BENCHMARKING.md), and [NEXT-STEPS.md](NEXT-STEPS.md) for RC milestone details
 
 ## Architecture
 
@@ -124,6 +124,7 @@ Open `http://localhost:8333/login.html` to authenticate and reach the dashboard.
 ## Related Documentation
 
 - [HOW-TO.md](HOW-TO.md) - Complete usage guide with examples from basic to extreme simulations
+- [docs/BENCHMARKING.md](docs/BENCHMARKING.md) - Benchmark presets for repeatable runs
 - [TESTING.md](TESTING.md) - Docker testing procedures and verification commands
 - [NEXT-STEPS.md](NEXT-STEPS.md) - Development roadmap and technical debt analysis
 - [BUILD_CARRYOVER.md](BUILD_CARRYOVER.md) - Development context and architecture overview
@@ -444,6 +445,7 @@ make test-integration
 
 ### Technical Documentation
 - **[HOW-TO.md](HOW-TO.md)** - Complete usage guide from basic to extreme simulations
+- **[docs/BENCHMARKING.md](docs/BENCHMARKING.md)** - Benchmark presets for repeatable runs
 - **[TESTING.md](TESTING.md)** - Docker testing procedures and API verification
 - **[NEXT-STEPS.md](NEXT-STEPS.md)** - Development roadmap and architecture improvements
 - **[BUILD_CARRYOVER.md](BUILD_CARRYOVER.md)** - Development context and system overview
