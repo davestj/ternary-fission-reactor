@@ -47,7 +47,13 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+var (
+    Version   = "dev"
+    BuildDate = "unknown"
+    GitCommit = "unknown"
 )
 
 // =============================================================================
@@ -1887,12 +1893,13 @@ func (s *TernaryFissionAPIServer) healthCheck(w http.ResponseWriter, r *http.Req
 	}
 	resp.Body.Close()
 
-	health := map[string]interface{}{
-		"status":               "healthy",
-		"timestamp":            time.Now().Format(time.RFC3339),
-		"uptime_seconds":       int64(uptime.Seconds()),
-		"active_energy_fields": status.ActiveEnergyFields,
-	}
+        health := map[string]interface{}{
+                "status":               "healthy",
+                "timestamp":            time.Now().Format(time.RFC3339),
+                "uptime_seconds":       int64(uptime.Seconds()),
+                "active_energy_fields": status.ActiveEnergyFields,
+                "version":              Version,
+        }
 
 	s.writeJSONResponse(w, http.StatusOK, health)
 }
@@ -1967,7 +1974,7 @@ func main() {
 
 	log.Println("=== Ternary Fission Energy Emulation API Server ===")
 	log.Printf("Author: bthlops (David StJ)")
-        log.Printf("Version: 2.0.0-rc1")
+        log.Printf("Version: %s", Version)
 	log.Printf("Starting server on port %d", config.APIPort)
 	log.Printf("🌐 Web Dashboard: http://localhost:%d/", config.APIPort)
 	log.Printf("📡 API Documentation: http://localhost:%d/api/v1", config.APIPort)
