@@ -315,8 +315,8 @@ curl -X POST http://localhost:8080/api/v1/energy-fields \
 ```bash
 # Available at http://localhost:8080/api/v1/metrics
 ternary_fission_api_requests_total
-ternary_fission_active_energy_fields
-ternary_fission_total_energy_mev
+reactor_active_fields
+reactor_total_energy_mev
 ternary_fission_api_response_time_seconds
 ```
 
