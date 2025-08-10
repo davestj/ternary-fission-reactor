@@ -105,6 +105,7 @@ curl http://localhost:8333/stream          # Stream media content
 - [TESTING.md](TESTING.md) - Docker testing procedures and verification commands
 - [NEXT-STEPS.md](NEXT-STEPS.md) - Development roadmap and technical debt analysis
 - [BUILD_CARRYOVER.md](BUILD_CARRYOVER.md) - Development context and architecture overview
+- [RELEASE.md](RELEASE.md) - Commit impact summary
 
 ## 🚀 Quick Start
 
