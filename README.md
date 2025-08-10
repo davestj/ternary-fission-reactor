@@ -14,6 +14,51 @@
 
 High-performance ternary nuclear fission simulation with C++ physics engine, Go REST API, and Docker deployment. Maps nuclear energy to computational resources with real-time monitoring and conservation law verification using multi-base mathematical frameworks.
 
+
+## Overview
+
+The system emulates ternary nuclear fission to explore how computational resources map to energy production. It pairs a high-speed C++ physics core with a Go-based API and web dashboard for monitoring and interaction.
+
+## Architecture
+
+See [ARCH.md](ARCH.md) for a complete description of the physics engine, API server, monitoring stack, and container layout.
+
+## Build Prerequisites
+
+- Ubuntu 24.04 with build-essential
+- GCC 13+ and C++17 libraries
+- Go 1.23+
+- Optional: Docker and Docker Compose for containerized runs
+
+## Build and Test
+
+```bash
+make cpp-build       # build C++ components
+make go-build        # build Go components
+make cpp-test        # run C++ unit tests
+make static-analysis # run static analysis
+```
+
+## Configuration Examples
+
+```ini
+# configs/ternary_fission.conf
+parent_mass=235.0
+excitation_energy=6.5
+web_root=web
+media_streaming_enabled=false
+```
+
+## Running the Daemon and Dashboard
+
+```bash
+# Run API daemon
+./bin/ternary-api -config configs/ternary_fission.conf &
+
+# Access web dashboard
+open http://localhost:8080
+```
+
 ## 📊 Current Development Status (v1.1.15-alpha)
 
 ### ✅ Fully Working Components
@@ -54,12 +99,12 @@ curl http://localhost:8333/stream          # Stream media content
 - **v1.2.100**: Performance optimization → **v1.3.1** Gold Release
 - **Current Focus**: Comprehensive API testing and Kubernetes integration
 
-## 📚 Documentation Links
+## Related Documentation
 
-- **[HOW-TO.md](HOW-TO.md)** - Complete usage guide with examples from basic to extreme simulations
-- **[TESTING.md](TESTING.md)** - Docker testing procedures and verification commands
-- **[NEXT-STEPS.md](NEXT-STEPS.md)** - Development roadmap and technical debt analysis
-- **[BUILD_CARRYOVER.md](BUILD_CARRYOVER.md)** - Development context and architecture overview
+- [HOW-TO.md](HOW-TO.md) - Complete usage guide with examples from basic to extreme simulations
+- [TESTING.md](TESTING.md) - Docker testing procedures and verification commands
+- [NEXT-STEPS.md](NEXT-STEPS.md) - Development roadmap and technical debt analysis
+- [BUILD_CARRYOVER.md](BUILD_CARRYOVER.md) - Development context and architecture overview
 
 ## 🚀 Quick Start
 
