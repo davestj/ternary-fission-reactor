@@ -201,3 +201,4 @@ The following summary outlines documentation updates and feature changes for eac
 - 2025-08-10 [f25de2d] Merge pull request #92 from davestj/codex/add-integration-tests-for-api-endpoints
 - 2025-08-10 [202a6a1] docs: expand README with build and run instructions
 - 2025-08-10 [cf05fa7] Merge pull request #93 from davestj/codex/update-readme.md-with-documentation-sections
+- 2025-08-10 [rc1docs] docs: document 2.0.0-rc1 release candidate and cross-link milestone docs

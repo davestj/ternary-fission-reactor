@@ -18,6 +18,8 @@
 - Container orchestration tested with proper graceful shutdown capabilities
 - All examples updated to reflect current working configuration
 
+**Release Candidate:** v2.0.0-rc1 — see [ARCH.md](ARCH.md) for architecture and [NEXT-STEPS.md](NEXT-STEPS.md) for roadmap milestones
+
 ## 🚀 Quick Start (Docker - Recommended)
 
 ### Fastest Way to Get Started

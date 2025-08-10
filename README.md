@@ -6,6 +6,7 @@
 ![Language](https://img.shields.io/badge/C%2B%2B-17-blue)
 ![Go Version](https://img.shields.io/badge/Go-1.23%2B-blue)
 ![Platform](https://img.shields.io/badge/Platform-Ubuntu%2024.04-green)
+![v2.0.0-rc1](https://img.shields.io/badge/Version-2.0.0--rc1-orange)
 
 **Author:** bthlops (David StJ)  
 **Version:** 1.1.15-alpha (Latest: [Releases](https://github.com/davestj/ternary-fission-reactor/releases))  
@@ -18,6 +19,13 @@ High-performance ternary nuclear fission simulation with C++ physics engine, Go 
 ## Overview
 
 The system emulates ternary nuclear fission to explore how computational resources map to energy production. It pairs a high-speed C++ physics core with a Go-based API and web dashboard for monitoring and interaction.
+
+## Version 2.0.0-rc1 Highlights
+
+- Distributed daemon architecture bridging C++ and Go components
+- Docker-first deployment with real-time monitoring stack
+- Kubernetes-ready configuration and release workflows
+- See [ARCH.md](ARCH.md), [HOW-TO.md](HOW-TO.md), and [NEXT-STEPS.md](NEXT-STEPS.md) for RC milestone details
 
 ## Architecture
 
