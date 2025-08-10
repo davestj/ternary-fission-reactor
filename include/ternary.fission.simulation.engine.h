@@ -116,6 +116,15 @@ public:
     void startContinuousSimulation(double events_per_second);
     void stopContinuousSimulation();
 
+    /**
+     * Start a timed portal load at specified power level
+     * We create an energy field load that persists for the given duration
+     *
+     * @param duration_seconds: Duration of the load
+     * @param power_level_mev: Energy level in MeV
+     */
+    void startPortalLoad(double duration_seconds, double power_level_mev);
+
     Json::Value startContinuousSimulationAPI(const Json::Value& request);
     Json::Value stopContinuousSimulationAPI();
     Json::Value getSystemStatusAPI() const;
