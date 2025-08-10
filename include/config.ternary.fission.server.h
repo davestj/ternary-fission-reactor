@@ -64,7 +64,8 @@ struct NetworkConfiguration {
     bool enable_cors = true;                    // Cross-Origin Resource Sharing
     std::vector<std::string> cors_origins;      // Allowed CORS origins
     int request_size_limit = 10485760;          // Maximum request size (10MB)
-    
+    std::string web_root;                       // Filesystem path for static assets
+
     NetworkConfiguration() {
         cors_origins = {"*"};  // Default to allow all origins
     }
