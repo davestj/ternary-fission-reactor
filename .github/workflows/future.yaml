@@ -1,10 +1,12 @@
-# File: .github/workflows/dev.yaml
-# Purpose: Development build verification
-name: Dev Build
+# File: .github/workflows/future.yaml
+# Purpose: Future branch build verification
+name: Future Build
 
 on:
     push:
-        branches: [dev]
+        branches: [future]
+    pull_request:
+        branches: [future]
 
 jobs:
     build:

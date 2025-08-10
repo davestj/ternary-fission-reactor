@@ -188,7 +188,7 @@ sudo ./install.sh
 
 ## 📦 Download Options
 
-### Development Artifacts (dev/develop branch)
+### Development Artifacts (dev branch)
 - `ternary-fission-reactor-VERSION-dev-release.tar.gz` - Development binaries (tar.gz)
 - `ternary-fission-reactor-VERSION-dev-release.zip` - Development binaries (zip)
 - `ternary-fission-reactor-VERSION-dev-debug.tar.gz` - Debug build with symbols
@@ -200,26 +200,38 @@ sudo ./install.sh
 - `ternary-fission-reactor-VERSION-source.tar.gz` - Clean source archive
 - `install.sh` - Automated system installer
 
+## Release Strategy
+
+- See [docs/RELEASE_STRATEGY.md](docs/RELEASE_STRATEGY.md) for full details.
+
+- **dev branch**: push-only CI for rapid iteration
+- **future branch**: CI on pushes and pull requests for staging releases
+- **master branch**: production releases after `dev` merges
+- **Promotion**: release candidates cut from `dev`, promoted to beta on `future`, then merged to `master`
+- **Packages**: Debian and Ubuntu `.deb` artifacts published for each production release
+
 ## 🏗️ Build Pipeline
 
 ### Branch Strategy
-- **develop/dev** → Development builds with debug symbols and test coverage
-- **master/main** → Production releases with optimized binaries
+- **dev** → Development builds with debug symbols and test coverage
+- **future** → Staging branch with push/PR CI
+- **master** → Production releases with optimized binaries
 - **feature/** → Pull request builds for testing
 - **v*tags** → Tagged releases with semantic versioning
 
 ### Automated Builds
 | Branch | Build Types | Artifacts | Retention | Release |
 |--------|-------------|-----------|-----------|---------|
-| develop/dev | release + debug | tar.gz + zip | 14 days | No |
-| master/main | release only | tar.gz + zip | 90 days | Yes |
+| dev | release + debug | tar.gz + zip | 14 days | No |
+| future | release + debug | tar.gz + zip | 14 days | No |
+| master | release only | tar.gz + zip + deb | 90 days | Yes |
 | PR | release + debug | tar.gz + zip | 7 days | No |
 | Tags | release only | tar.gz + zip | Permanent | Yes |
 
 ### Version Strategy
 - **Alpha** (dev): `1.1.1-alpha.X` - Development builds
-- **Beta** (master PR): `1.1.1-beta.X` - Pre-release testing
-- **RC** (manual): `1.1.1-rc.X` - Release candidates
+- **Beta** (future): `1.1.1-beta.X` - Pre-release testing
+- **RC** (future): `1.1.1-rc.X` - Release candidates
 - **Release** (tags): `1.1.1` - Production releases
 
 ## 🏢 Architecture
@@ -447,13 +459,13 @@ make test-integration
 
 ### Development Process
 1. Fork the repository
-2. Create feature branch from `develop`
+2. Create feature branch from `dev`
 3. Make changes and add tests
 4. Ensure all builds pass (including Docker)
-5. Submit pull request to `develop`
+5. Submit pull request to `future`
 6. Wait for review and automated testing
-7. Merge triggers development artifacts
-8. Promotion to `master` creates production release
+7. Merge into `dev` triggers development artifacts
+8. Promotion from `dev` to `master` creates production release
 
 ### Code Standards
 - C++17 standard with GCC 13+

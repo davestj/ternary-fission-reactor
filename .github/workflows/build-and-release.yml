@@ -15,7 +15,9 @@ name: Build and Release Pipeline
 
 on:
   push:
-    branches: [ master, main, develop, dev ]
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
   workflow_dispatch:
 
 permissions:
@@ -44,45 +46,58 @@ jobs:
         
     - name: Calculate version
       id: version
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        BUILD_NUM=${{ github.run_number }}
-        
-        # We implement version rollover logic
-        if [[ "${{ github.ref_name }}" == "master" ]] || [[ "${{ github.ref_name }}" == "main" ]]; then
-          # Production versioning with rollover logic
-          if [[ $BUILD_NUM -ge 25 && $BUILD_NUM -lt 100 ]]; then
-            # v1.1.25+ becomes v1.2.1-beta
-            BETA_NUM=$((BUILD_NUM - 24))
-            VERSION="1.2.${BETA_NUM}-beta"
-          elif [[ $BUILD_NUM -ge 100 ]]; then
-            # v1.2.100+ becomes v1.3.1+ gold
-            GOLD_NUM=$((BUILD_NUM - 99))
-            VERSION="1.3.${GOLD_NUM}"
-          else
-            # v1.1.1-24 stays alpha
-            VERSION="1.1.${BUILD_NUM}"
-          fi
-          IS_PROD="true"
+        API="https://api.github.com/repos/${{ github.repository }}/actions/workflows/build-and-release.yml/runs"
+        BASE_URL="${API}?branch=dev&status=success&per_page=5"
+        count=0
+        prev=0
+        page=1
+
+        while true; do
+            data=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "$BASE_URL&page=$page")
+            runs=$(echo "$data" | jq '.workflow_runs')
+            len=$(echo "$runs" | jq 'length')
+            [ "$len" -eq 0 ] && break
+            for run in $(echo "$runs" | jq '.[].run_number'); do
+                if [ "$count" -eq 0 ]; then
+                    prev=$run
+                    count=1
+                else
+                    expected=$((prev - 1))
+                    if [ "$run" -eq "$expected" ]; then
+                        count=$((count + 1))
+                        prev=$run
+                    else
+                        len=0
+                        break
+                    fi
+                fi
+            done
+            [ "$len" -eq 0 ] && break
+            [ "$count" -gt 10 ] && break
+            page=$((page + 1))
+        done
+
+        if [ "$count" -lt 5 ]; then
+            VERSION="2.0.${count}-beta"
+            IS_PROD="false"
+        elif [ "$count" -le 10 ]; then
+            VERSION="2.0.0-rc${count}"
+            IS_PROD="false"
         else
-          # Development versioning
-          if [[ $BUILD_NUM -ge 25 && $BUILD_NUM -lt 100 ]]; then
-            BETA_NUM=$((BUILD_NUM - 24))
-            VERSION="1.2.${BETA_NUM}-beta-dev"
-          elif [[ $BUILD_NUM -ge 100 ]]; then
-            GOLD_NUM=$((BUILD_NUM - 99))
-            VERSION="1.3.${GOLD_NUM}-dev"
-          else
-            VERSION="1.1.${BUILD_NUM}-alpha-dev"
-          fi
-          IS_PROD="false"
+            prod=$((count - 10))
+            VERSION="2.0.${prod}"
+            IS_PROD="true"
         fi
-        
+
         TAG="v${VERSION}"
-        
+
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "tag=$TAG" >> $GITHUB_OUTPUT
         echo "is_prod=$IS_PROD" >> $GITHUB_OUTPUT
-        echo "Generated version: $VERSION for branch ${{ github.ref_name }} (build #$BUILD_NUM)"
+        echo "Calculated version: $VERSION based on $count consecutive successes"
 
   # We build the application
   build:
@@ -98,8 +113,9 @@ jobs:
         sudo apt update
         sudo apt install -y \
           build-essential gcc-13 g++-13 cmake make \
-          libssl-dev libboost-all-dev git zip tar gzip
-          
+          libssl-dev libboost-all-dev git zip tar gzip \
+          dpkg-dev
+
         sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
         sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
         
@@ -124,17 +140,17 @@ jobs:
     - name: Package artifacts
       run: |
         mkdir -p artifacts/${{ needs.version.outputs.version }}
-        
+
         # Copy binaries if they exist
         cp bin/* artifacts/${{ needs.version.outputs.version }}/ 2>/dev/null || echo "No binaries found"
-        
+
         # Copy configs and docs
         cp -r configs artifacts/${{ needs.version.outputs.version }}/ 2>/dev/null || echo "No configs"
         cp README.md artifacts/${{ needs.version.outputs.version }}/ 2>/dev/null || echo "No README"
         cp BUILD_CARRYOVER.md artifacts/${{ needs.version.outputs.version }}/ 2>/dev/null || echo "No BUILD_CARRYOVER"
         cp LICENSE artifacts/${{ needs.version.outputs.version }}/ 2>/dev/null || echo "No LICENSE"
         cp HOWTO.md artifacts/${{ needs.version.outputs.version }}/ 2>/dev/null || echo "No HOWTO"
-        
+
         # Create version file
         cat > artifacts/${{ needs.version.outputs.version }}/VERSION << EOF
         Version: ${{ needs.version.outputs.version }}
@@ -144,12 +160,30 @@ jobs:
         Build Type: ${{ needs.version.outputs.is_prod == 'true' && 'Production' || 'Development' }}
         Platform: Ubuntu 24.04 x86_64
         EOF
-        
+
+        # Build Debian packages for Debian and Ubuntu
+        for distro in debian ubuntu; do
+            pkg_dir="package_$distro"
+            mkdir -p "$pkg_dir/DEBIAN" "$pkg_dir/usr/local/bin"
+            cat > "$pkg_dir/DEBIAN/control" << EOC
+        Package: ${{ env.PROJECT_NAME }}
+        Version: ${{ needs.version.outputs.version }}
+        Section: utils
+        Priority: optional
+        Architecture: amd64
+        Maintainer: Ternary Fission Reactor Team
+        Description: Ternary Fission Reactor binaries
+        EOC
+            cp bin/* "$pkg_dir/usr/local/bin/" 2>/dev/null || echo "No binaries"
+            dpkg-deb --build "$pkg_dir" "artifacts/${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-${distro}.deb"
+            rm -rf "$pkg_dir"
+        done
+
         # Create archives
         cd artifacts
         tar -czf ${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}.tar.gz ${{ needs.version.outputs.version }}/
         zip -r ${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}.zip ${{ needs.version.outputs.version }}/
-        sha256sum *.tar.gz *.zip > SHA256SUMS
+        sha256sum *.tar.gz *.zip *.deb > SHA256SUMS
         cd ..
         
     - name: Upload artifacts
@@ -219,10 +253,11 @@ jobs:
     - name: Prepare release assets
       run: |
         mkdir -p release-assets
-        
+
         # Copy all artifacts
         cp release-binaries/*.tar.gz release-assets/ 2>/dev/null || echo "No binary tar.gz"
-        cp release-binaries/*.zip release-assets/ 2>/dev/null || echo "No binary zip" 
+        cp release-binaries/*.zip release-assets/ 2>/dev/null || echo "No binary zip"
+        cp release-binaries/*.deb release-assets/ 2>/dev/null || echo "No binary deb"
         cp release-source/*.tar.gz release-assets/ 2>/dev/null || echo "No source tar.gz"
         cp release-source/*.zip release-assets/ 2>/dev/null || echo "No source zip"
         cp release-binaries/SHA256SUMS release-assets/SHA256SUMS-BINARIES 2>/dev/null || echo "No binary checksums"
@@ -290,6 +325,8 @@ jobs:
         - **Platform**: Ubuntu 24.04 x86_64
         
         ### Download
+        - Debian Package: \`${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-debian.deb\`
+        - Ubuntu Package: \`${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-ubuntu.deb\`
         - Binary Package (tar.gz): \`${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}.tar.gz\`
         - Binary Package (zip): \`${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}.zip\`
         - Source Code (tar.gz): \`${{ env.PROJECT_NAME }}-${{ needs.version.outputs.version }}-source.tar.gz\`
