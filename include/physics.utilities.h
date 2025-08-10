@@ -125,6 +125,22 @@ void allocateEnergyField(EnergyField& field, double energy_mev);
 void dissipateEnergyField(EnergyField& field, int rounds);
 
 /*
+ * Generate random momentum for a fission fragment
+ * We create realistic momentum vectors for physics simulation
+ *
+ * @param fragment: Fragment to assign momentum
+ */
+void generateRandomMomentum(FissionFragment& fragment);
+
+/*
+ * Apply conservation laws to a fission event
+ * We adjust fragment properties to ensure conservation
+ *
+ * @param event: Ternary fission event to normalize
+ */
+void applyConservationLaws(TernaryFissionEvent& event);
+
+/*
  * Calculate field interference between two energy fields
  * We model quantum interference effects between fields
  *
