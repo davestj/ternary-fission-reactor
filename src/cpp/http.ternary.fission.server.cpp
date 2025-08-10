@@ -305,7 +305,32 @@ bool HTTPTernaryFissionServer::initialize() {
     if (!ssl_enabled_) {
         http_server_ = std::make_unique<httplib::Server>();
     }
-    
+
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+    auto server = ssl_enabled_ ?
+        static_cast<httplib::Server*>(https_server_.get()) :
+        static_cast<httplib::Server*>(http_server_.get());
+#else
+    auto server = static_cast<httplib::Server*>(http_server_.get());
+#endif
+
+    if (server) {
+        server->set_mount_point("/", network_config.web_root);
+        server->set_file_extension_and_mimetype_mapping("html", "text/html");
+        server->set_file_extension_and_mimetype_mapping("css", "text/css");
+        server->set_file_extension_and_mimetype_mapping("js", "application/javascript");
+        server->set_file_extension_and_mimetype_mapping("json", "application/json");
+        server->set_file_extension_and_mimetype_mapping("mp3", "audio/mpeg");
+        server->set_file_extension_and_mimetype_mapping("ogg", "audio/ogg");
+        server->set_file_extension_and_mimetype_mapping("mp4", "video/mp4");
+        server->set_file_extension_and_mimetype_mapping("webm", "video/webm");
+        server->set_file_extension_and_mimetype_mapping("png", "image/png");
+        server->set_file_extension_and_mimetype_mapping("jpg", "image/jpeg");
+        server->set_file_extension_and_mimetype_mapping("jpeg", "image/jpeg");
+        server->set_file_extension_and_mimetype_mapping("gif", "image/gif");
+        server->set_file_extension_and_mimetype_mapping("svg", "image/svg+xml");
+    }
+
     // We setup middleware and endpoints
     setupMiddleware();
     setupAPIEndpoints();
@@ -456,6 +481,10 @@ void HTTPTernaryFissionServer::setupMiddleware() {
     
     // We setup pre-routing middleware
     server->set_pre_routing_handler([this](const httplib::Request& req, httplib::Response& res) {
+        if (req.path.find("..") != std::string::npos) {
+            res.status = 403;
+            return httplib::Server::HandlerResponse::Handled;
+        }
         this->corsMiddleware(req, res);
         this->loggingMiddleware(req, res);
         this->metricsMiddleware(req, res);
