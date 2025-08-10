@@ -234,7 +234,8 @@ bool ConfigurationManager::parseNetworkConfiguration() {
     network_config_.connection_timeout = getConfigInt("connection_timeout", 30);
     network_config_.enable_cors = getConfigBool("enable_cors", true);
     network_config_.request_size_limit = getConfigInt("request_size_limit", 10485760);
-    
+    network_config_.web_root = getConfigValue("web_root", "");
+
     // We parse CORS origins list
     std::string cors_origins_str = getConfigValue("cors_origins", "*");
     if (cors_origins_str != "*") {
@@ -357,7 +358,13 @@ bool ConfigurationManager::validateNetworkConfiguration() {
         addValidationError("Invalid request_size_limit: " + std::to_string(network_config_.request_size_limit));
         valid = false;
     }
-    
+
+    // We validate web root directory
+    if (!ConfigurationUtils::validateDirectoryPath(network_config_.web_root, false)) {
+        addValidationError("Invalid web_root: " + network_config_.web_root);
+        valid = false;
+    }
+
     return valid;
 }
 
