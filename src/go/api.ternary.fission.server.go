@@ -63,6 +63,7 @@ type Config struct {
 	MaxRequestSize           int64  `config:"max_request_size"`
 	MaxConcurrentConnections int    `config:"max_concurrent_connections"`
 	ReactorBaseURL           string `config:"reactor_base_url"`
+	StatusPollInterval       int    `config:"status_poll_interval"`
 
 	// WebSocket settings
 	WebSocketEnabled      bool `config:"websocket_enabled"`
@@ -95,6 +96,7 @@ func defaultConfig() *Config {
 		MaxRequestSize:           10485760,
 		MaxConcurrentConnections: 1000,
 		ReactorBaseURL:           "http://127.0.0.1:8333",
+		StatusPollInterval:       15,
 		WebSocketEnabled:         true,
 		WebSocketBufferSize:      4096,
 		WebSocketTimeout:         300,
@@ -163,6 +165,10 @@ func parseConfigFile(filename string) (*Config, error) {
 		case "reactor_base_url":
 			// Base URL for the backing reactor service
 			config.ReactorBaseURL = value
+		case "status_poll_interval":
+			if interval, err := strconv.Atoi(value); err == nil {
+				config.StatusPollInterval = interval
+			}
 		case "events_per_second":
 			if eps, err := strconv.ParseFloat(value, 64); err == nil {
 				config.EventsPerSecond = eps
@@ -255,10 +261,10 @@ type TernaryFissionAPIServer struct {
 	startTime         time.Time
 
 	// Performance metrics
-	requestCounter    *prometheus.CounterVec
-	responseTime      *prometheus.HistogramVec
-	activeFieldsGauge prometheus.Gauge
-	energyTotalGauge  prometheus.Gauge
+	requestCounter      *prometheus.CounterVec
+	responseTime        *prometheus.HistogramVec
+	reactorActiveFields prometheus.Gauge
+	reactorTotalEnergy  prometheus.Gauge
 
 	// Reactor communication
 	reactorClient *http.Client
@@ -296,6 +302,7 @@ func NewTernaryFissionAPIServer(config *Config) *TernaryFissionAPIServer {
 	// We initialize Prometheus metrics for monitoring
 	if config.PrometheusEnabled {
 		server.initializeMetrics()
+		server.startReactorStatusPolling()
 	}
 
 	// We set up HTTP routes
@@ -336,25 +343,59 @@ func (s *TernaryFissionAPIServer) initializeMetrics() {
 		[]string{"endpoint", "method"},
 	)
 
-	s.activeFieldsGauge = prometheus.NewGauge(
+	s.reactorActiveFields = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "ternary_fission_active_energy_fields",
-			Help: "Number of currently active energy fields",
+			Name: "reactor_active_fields",
+			Help: "Number of active reactor energy fields",
 		},
 	)
 
-	s.energyTotalGauge = prometheus.NewGauge(
+	s.reactorTotalEnergy = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Name: "ternary_fission_total_energy_mev",
-			Help: "Total energy simulated in MeV",
+			Name: "reactor_total_energy_mev",
+			Help: "Total reactor energy in MeV",
 		},
 	)
 
 	// We register metrics with Prometheus
 	prometheus.MustRegister(s.requestCounter)
 	prometheus.MustRegister(s.responseTime)
-	prometheus.MustRegister(s.activeFieldsGauge)
-	prometheus.MustRegister(s.energyTotalGauge)
+	prometheus.MustRegister(s.reactorActiveFields)
+	prometheus.MustRegister(s.reactorTotalEnergy)
+}
+
+// We periodically poll the reactor status and update Prometheus metrics
+func (s *TernaryFissionAPIServer) startReactorStatusPolling() {
+	ticker := time.NewTicker(time.Duration(s.config.StatusPollInterval) * time.Second)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				s.updateReactorMetrics()
+			case <-s.ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+// We query the reactor status endpoint and update our gauges
+func (s *TernaryFissionAPIServer) updateReactorMetrics() {
+	resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/status", s.config.ReactorBaseURL))
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return
+	}
+	var status SystemStatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+		return
+	}
+	s.reactorActiveFields.Set(float64(status.ActiveEnergyFields))
+	s.reactorTotalEnergy.Set(status.TotalEnergySimulated)
 }
 
 // We set up all HTTP routes and middleware with proper error handling
@@ -1621,8 +1662,8 @@ func (s *TernaryFissionAPIServer) getSystemStatus(w http.ResponseWriter, r *http
 	}
 
 	if s.config.PrometheusEnabled {
-		s.activeFieldsGauge.Set(float64(status.ActiveEnergyFields))
-		s.energyTotalGauge.Set(status.TotalEnergySimulated)
+		s.reactorActiveFields.Set(float64(status.ActiveEnergyFields))
+		s.reactorTotalEnergy.Set(status.TotalEnergySimulated)
 	}
 
 	s.writeJSONResponse(w, http.StatusOK, status)
