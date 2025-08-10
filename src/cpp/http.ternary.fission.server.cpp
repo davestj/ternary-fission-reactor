@@ -635,6 +635,10 @@ void HTTPTernaryFissionServer::setupAPIEndpoints() {
         this->handleSimulationReset(req, res);
     });
 
+    server->Put("/api/v1/portal/trigger", [this](const httplib::Request& req, httplib::Response& res) {
+        this->handlePortalTrigger(req, res);
+    });
+
     // We setup media streaming control endpoints
     server->Post("/api/v1/stream/start", [this](const httplib::Request& req, httplib::Response& res) {
         this->handleStreamStart(req, res);
@@ -1294,6 +1298,42 @@ void HTTPTernaryFissionServer::handleSimulationReset(const httplib::Request& /*r
         sendErrorResponse(res, 500, std::string("Failed to reset simulation: ") + e.what());
         metrics_->incrementErrors();
     }
+}
+
+/**
+ * We handle portal trigger endpoint requests
+ * This method schedules a timed energy load through the simulation engine
+ */
+void HTTPTernaryFissionServer::handlePortalTrigger(const httplib::Request& req, httplib::Response& res) {
+    Json::Value body;
+    if (!parseJSONRequest(req, body)) {
+        sendErrorResponse(res, 400, "Invalid JSON request body");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    double duration = body.get("duration_seconds", 900.0).asDouble();
+    if (duration <= 0.0) {
+        duration = 900.0;
+    }
+    double power = body.get("power_level_mev", 0.0).asDouble();
+
+    {
+        std::lock_guard<std::mutex> lock(simulation_mutex_);
+        if (!simulation_engine_) {
+            sendErrorResponse(res, 500, "Simulation engine not initialized");
+            metrics_->incrementErrors();
+            return;
+        }
+        simulation_engine_->startPortalLoad(duration, power);
+    }
+
+    Json::Value ack;
+    ack["scheduled_duration_seconds"] = duration;
+    ack["projected_power_level_mev"] = power;
+
+    sendJSONResponse(res, 200, ack);
+    metrics_->incrementSuccessful();
 }
 
 void HTTPTernaryFissionServer::handleStreamStart(const httplib::Request& /*req*/, httplib::Response& res) {

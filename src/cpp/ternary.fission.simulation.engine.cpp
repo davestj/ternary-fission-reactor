@@ -577,6 +577,31 @@ void TernaryFissionSimulationEngine::stopContinuousSimulation() {
 }
 
 /*
+ * Start a timed portal load
+ * We create an energy field and maintain it for the specified duration
+ */
+void TernaryFissionSimulationEngine::startPortalLoad(double duration_seconds, double power_level_mev) {
+    std::thread([this, duration_seconds, power_level_mev]() {
+        EnergyField field = createEnergyField(power_level_mev);
+        {
+            std::lock_guard<std::mutex> lock(state_mutex);
+            simulation_state.active_energy_fields.push_back(field);
+        }
+
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(static_cast<int64_t>(duration_seconds * 1000.0))
+        );
+
+        {
+            std::lock_guard<std::mutex> lock(state_mutex);
+            if (!simulation_state.active_energy_fields.empty()) {
+                simulation_state.active_energy_fields.pop_back();
+            }
+        }
+    }).detach();
+}
+
+/*
  * Get total events simulated
  */
 uint64_t TernaryFissionSimulationEngine::getTotalEventsSimulated() const {

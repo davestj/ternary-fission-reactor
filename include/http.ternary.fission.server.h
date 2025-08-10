@@ -201,6 +201,7 @@ private:
     void handleSimulationStart(const httplib::Request& req, httplib::Response& res); // Start simulation
     void handleSimulationStop(const httplib::Request& req, httplib::Response& res); // Stop simulation
     void handleSimulationReset(const httplib::Request& req, httplib::Response& res); // Reset simulation
+    void handlePortalTrigger(const httplib::Request& req, httplib::Response& res); // Trigger portal load
     void handleStreamStart(const httplib::Request& req, httplib::Response& res); // Start media streaming
     void handleStreamStop(const httplib::Request& req, httplib::Response& res);  // Stop media streaming
     void handleFissionCalculation(const httplib::Request& req, httplib::Response& res); // Fission calc
