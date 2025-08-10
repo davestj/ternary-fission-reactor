@@ -415,7 +415,9 @@ func (s *TernaryFissionAPIServer) setupRoutes() {
 		s.router.Use(s.corsMiddleware)
 	}
 
-	// We serve the enhanced web dashboard at root - FIXED routing
+    s.router.HandleFunc("/api/v1/portal/trigger", s.triggerPortalSimulation).Methods("PUT")
+
+        // We serve the enhanced web dashboard at root - FIXED routing
 	s.router.PathPrefix("/").HandlerFunc(s.routeHandler).Methods("GET")
 
 	log.Println("API routes configured successfully with enhanced dashboard")
@@ -1892,9 +1894,49 @@ func (s *TernaryFissionAPIServer) dissipateEnergyField(w http.ResponseWriter, r 
 	}
 	defer resp.Body.Close()
 
-	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+        w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+        w.WriteHeader(resp.StatusCode)
+        io.Copy(w, resp.Body)
+}
+
+// We trigger portal simulations by forwarding the request to the reactor
+func (s *TernaryFissionAPIServer) triggerPortalSimulation(w http.ResponseWriter, r *http.Request) {
+    var req struct {
+        DurationSeconds int     `json:"duration_seconds"`
+        PowerLevelMEV   float64 `json:"power_level_mev"`
+    }
+
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        s.writeErrorResponse(w, http.StatusBadRequest, "Invalid request body")
+        return
+    }
+    if req.DurationSeconds <= 0 {
+        req.DurationSeconds = 900
+    }
+
+    body, err := json.Marshal(req)
+    if err != nil {
+        s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to encode request")
+        return
+    }
+
+    reactorReq, err := http.NewRequest(http.MethodPut, fmt.Sprintf("%s/api/v1/portal/trigger", s.config.ReactorBaseURL), bytes.NewReader(body))
+    if err != nil {
+        s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to build reactor request")
+        return
+    }
+    reactorReq.Header.Set("Content-Type", "application/json")
+
+    resp, err := s.reactorClient.Do(reactorReq)
+    if err != nil {
+        s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+        return
+    }
+    defer resp.Body.Close()
+
+    w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+    w.WriteHeader(resp.StatusCode)
+    io.Copy(w, resp.Body)
 }
 
 // =============================================================================
