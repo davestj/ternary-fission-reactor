@@ -82,10 +82,10 @@ TernaryFissionSimulationEngine::TernaryFissionSimulationEngine(double default_ma
       num_worker_threads(threads),
       total_events_simulated(0),
       total_energy_fields_created(0),
-      total_computation_time_seconds(0.0),
       shutdown_requested(false),
       continuous_mode_active(false),
       target_events_per_second(10.0),
+      total_computation_time_seconds(0.0),
       api_request_counter_(0),
       json_serialization_enabled_(true) {
 
