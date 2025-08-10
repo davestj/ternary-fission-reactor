@@ -684,7 +684,7 @@ void HTTPTernaryFissionServer::handleHealthCheck(const httplib::Request& /*req*/
     health["uptime_seconds"] = static_cast<Json::Int64>(uptime.count());
     health["active_energy_fields"] = static_cast<Json::Int64>(energy_fields_.size());
     health["simulation_running"] = simulation_engine_ != nullptr;
-    health["version"] = "2.0.0-rc1";
+    health["version"] = VERSION;
     health["author"] = "bthlops (David StJ)";
     
     auto now = std::chrono::system_clock::now();
