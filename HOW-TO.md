@@ -53,6 +53,14 @@ curl http://localhost:8080/api/v1/metrics   # Prometheus metrics
 curl http://localhost:8080/                 # Educational interface
 ```
 
+### Static Files and Streaming
+`web_root` serves static assets while `media_root` provides optional streaming content.
+
+```bash
+curl http://localhost:8333/index.html     # Fetch static test page
+curl http://localhost:8333/stream         # Stream media content
+```
+
 ## 🔧 Dependencies
 
 For native builds, install the header-only [cpp-httplib](https://github.com/yhirose/cpp-httplib) library:

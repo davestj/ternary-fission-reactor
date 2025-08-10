@@ -33,6 +33,15 @@ High-performance ternary nuclear fission simulation with C++ physics engine, Go 
 - **Prometheus Metrics**: `http://localhost:8080/api/v1/metrics` - Performance monitoring
 - **API Documentation**: `http://localhost:8080/api/v1/` - REST API reference
 
+### Static Files and Media Streaming
+- **Static Files** (`web_root`): `http://localhost:8333/index.html` - Files served from the configurable web root
+- **Media Stream** (`media_root`): `http://localhost:8333/stream` - Icecast stream when `media_streaming_enabled` is true
+
+```bash
+curl http://localhost:8333/index.html      # Fetch static test page
+curl http://localhost:8333/stream          # Stream media content
+```
+
 ### ⚠️ In Testing/Validation Phase
 - **WebSocket Monitoring**: Basic implementation, real-time validation ongoing
 - **Energy Field Management**: Core functionality present, comprehensive testing needed
