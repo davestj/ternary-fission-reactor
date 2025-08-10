@@ -763,6 +763,8 @@ void TernaryFissionSimulationEngine::processFissionEvent(const TernaryFissionEve
  * We process events from the queue in parallel
  */
 void TernaryFissionSimulationEngine::workerThreadFunction(int thread_id) {
+    (void)thread_id;
+
     while (!shutdown_requested.load()) {
         std::unique_lock<std::mutex> lock(queue_mutex);
 
@@ -850,6 +852,8 @@ void TernaryFissionSimulationEngine::updateEnergyFields() {
  * We record events for analysis
  */
 void TernaryFissionSimulationEngine::logFissionEvent(const TernaryFissionEvent& event) {
+    (void)event;
+
     // Event logging implementation would write to log files
     // For now, we just track in memory
 }
