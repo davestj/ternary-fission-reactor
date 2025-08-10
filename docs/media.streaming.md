@@ -7,6 +7,7 @@ Purpose: Instructions for preparing playlists and using ices2 with the daemon
 Reason: Document new audio/video streaming capabilities
 Change Log:
 - 2025-08-10: Initial media streaming documentation
+- 2025-08-25: Add web_root example and note version 2.0.0-rc1
 -->
 
 # Media Streaming Setup
@@ -14,10 +15,13 @@ Change Log:
 The daemon can optionally stream audio or video content to an Icecast server using the `ices2` utility. Enable streaming by setting the following configuration fields:
 
 ```
+web_root = web
 media_streaming_enabled = true
 media_root = /path/to/media
 icecast_mount = /stream
 ```
+
+These options are available in version `2.0.0-rc1` and later.
 
 ## Preparing Playlists
 
