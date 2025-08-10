@@ -175,7 +175,7 @@ TEST_BINARIES := $(FD_COUNT_TEST) $(SYSTEM_METRICS_TEST) $(INTEGRATION_TEST)
 # =============================================================================
 # TARGETS
 # =============================================================================
-.PHONY: all cpp-build help clean test qa install docker release dist deb test-fd test-metrics test-integration
+.PHONY: all cpp-build go-build go-test help clean test qa install docker release dist deb test-fd test-metrics test-integration
 
 all: info $(CPP_MAIN) go-build
 
@@ -229,6 +229,13 @@ cpp-build: $(CPP_MAIN)
 go-build:
 	@cd $(GO_SRC_DIR) && $(GO) build -ldflags "-X main.Version=$(VERSION) -X main.BuildDate=$(BUILD_DATE) -X main.GitCommit=$(GIT_COMMIT)" -o ../../$(GO_BINARY)
 	@echo "✓ Go binary built: $(GO_BINARY)"
+
+# =============================================================================
+# GO TEST
+# =============================================================================
+go-test:
+	@cd $(GO_SRC_DIR) && $(GO) test ./...
+	@echo "✓ Go tests passed"
 
 # =============================================================================
 # TEST AND QA
