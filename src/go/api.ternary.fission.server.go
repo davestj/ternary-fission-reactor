@@ -244,14 +244,14 @@ type SystemStatusResponse struct {
 	TotalFissionEvents   uint64  `json:"total_fission_events"`
 	TotalEnergySimulated float64 `json:"total_energy_simulated_mev"`
 	ActiveEnergyFields   int     `json:"active_energy_fields"`
-        PeakMemoryUsage      uint64  `json:"peak_memory_usage_bytes"`
-        AverageCalcTime      float64 `json:"average_calculation_time_microseconds"`
-        TotalCalculations    uint64  `json:"total_calculations"`
-        SimulationRunning    bool    `json:"simulation_running"`
-        CPUUsagePercent      float64 `json:"cpu_usage_percent"`
-        MemoryUsagePercent   float64 `json:"memory_usage_percent"`
-        EstimatedPower       float64 `json:"estimated_power_mev"`
-        PortalDurationRemain int     `json:"portal_duration_remaining_seconds"`
+	PeakMemoryUsage      uint64  `json:"peak_memory_usage_bytes"`
+	AverageCalcTime      float64 `json:"average_calculation_time_microseconds"`
+	TotalCalculations    uint64  `json:"total_calculations"`
+	SimulationRunning    bool    `json:"simulation_running"`
+	CPUUsagePercent      float64 `json:"cpu_usage_percent"`
+	MemoryUsagePercent   float64 `json:"memory_usage_percent"`
+	EstimatedPower       float64 `json:"estimated_power_mev"`
+	PortalDurationRemain int     `json:"portal_duration_remaining_seconds"`
 }
 
 // =============================================================================
@@ -417,9 +417,9 @@ func (s *TernaryFissionAPIServer) setupRoutes() {
 		s.router.Use(s.corsMiddleware)
 	}
 
-    s.router.HandleFunc("/api/v1/portal/trigger", s.triggerPortalSimulation).Methods("PUT")
+	s.router.HandleFunc("/api/v1/portal/trigger", s.triggerPortalSimulation).Methods("PUT")
 
-        // We serve the enhanced web dashboard at root - FIXED routing
+	// We serve the enhanced web dashboard at root - FIXED routing
 	s.router.PathPrefix("/").HandlerFunc(s.routeHandler).Methods("GET")
 
 	log.Println("API routes configured successfully with enhanced dashboard")
@@ -859,6 +859,21 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
             backdrop-filter: blur(5px);
         }
 
+        .progress-container {
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            height: 8px;
+            margin-top: 10px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            width: 0%;
+            transition: width 0.5s linear;
+        }
+
         .footer {
             text-align: center;
             padding: 20px;
@@ -1015,6 +1030,16 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
             <div class="chart-card">
                 <canvas id="eventChart"></canvas>
             </div>
+            <div class="chart-card">
+                <canvas id="powerChart"></canvas>
+                <div class="metric" style="margin-top:10px;">
+                    <span class="metric-label">Portal Remaining:</span>
+                    <span class="metric-value" id="portalRemaining">Idle</span>
+                </div>
+                <div class="progress-container">
+                    <div id="portalProgressBar" class="progress-bar"></div>
+                </div>
+            </div>
         </div>
 
         <div class="energy-visualization">
@@ -1169,8 +1194,10 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
         let energyChart;
         let resourceChart;
         let eventChart;
+        let powerChart;
         let lastEventCount = 0;
         let lastEventTime = Date.now();
+        let portalTotalDuration = 0;
 
         // We initialize the dashboard when page loads
         document.addEventListener('DOMContentLoaded', function() {
@@ -1226,6 +1253,12 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
                     eventChart.data.labels.push(label);
                     eventChart.data.datasets[1].data.push(eventRate);
 
+                    powerChart.data.labels.push(label);
+                    powerChart.data.datasets[0].data.push(data.estimated_power_mev);
+                    powerChart.update();
+
+                    updatePortalProgress(data.portal_duration_remaining_seconds);
+                    
                     // We update connection status
                     const statusElement = document.getElementById('server-status');
                     statusElement.textContent = 'Connected';
@@ -1274,6 +1307,24 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
                 .catch(error => {
                     console.error('❌ Failed to fetch energy fields:', error);
                 });
+        }
+
+        // We update portal progress bar and remaining time display
+        function updatePortalProgress(remainingSeconds) {
+            const progressBar = document.getElementById('portalProgressBar');
+            const remainingLabel = document.getElementById('portalRemaining');
+            if (remainingSeconds > 0) {
+                if (portalTotalDuration === 0 || remainingSeconds > portalTotalDuration) {
+                    portalTotalDuration = remainingSeconds;
+                }
+                const percent = (remainingSeconds / portalTotalDuration) * 100;
+                progressBar.style.width = percent + '%';
+                remainingLabel.textContent = formatUptime(remainingSeconds);
+            } else {
+                portalTotalDuration = 0;
+                progressBar.style.width = '0%';
+                remainingLabel.textContent = 'Idle';
+            }
         }
 
         // We initialize Chart.js visualizations
@@ -1351,6 +1402,24 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
                         y: { beginAtZero: true, position: 'left' },
                         y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } }
                     }
+                }
+            });
+
+            const ctxPower = document.getElementById('powerChart').getContext('2d');
+            powerChart = new Chart(ctxPower, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Estimated Power (MeV)',
+                        borderColor: '#ff8a65',
+                        backgroundColor: 'rgba(255,138,101,0.2)',
+                        data: [],
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    scales: { y: { beginAtZero: true } }
                 }
             });
         }
@@ -1896,55 +1965,55 @@ func (s *TernaryFissionAPIServer) dissipateEnergyField(w http.ResponseWriter, r 
 	}
 	defer resp.Body.Close()
 
-        w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-        w.WriteHeader(resp.StatusCode)
-        io.Copy(w, resp.Body)
+	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+	w.WriteHeader(resp.StatusCode)
+	io.Copy(w, resp.Body)
 }
 
 // We trigger portal simulations by forwarding the request to the reactor
 func (s *TernaryFissionAPIServer) triggerPortalSimulation(w http.ResponseWriter, r *http.Request) {
-    var req struct {
-        DurationSeconds int     `json:"duration_seconds"`
-        PowerLevelMEV   float64 `json:"power_level_mev"`
-    }
+	var req struct {
+		DurationSeconds int     `json:"duration_seconds"`
+		PowerLevelMEV   float64 `json:"power_level_mev"`
+	}
 
-    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        s.writeErrorResponse(w, http.StatusBadRequest, "Invalid request body")
-        return
-    }
-    if req.DurationSeconds == 0 {
-        req.DurationSeconds = 900
-    } else if req.DurationSeconds < 0 {
-        s.writeErrorResponse(w, http.StatusBadRequest, "Duration must be non-negative")
-        return
-    }
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	if req.DurationSeconds == 0 {
+		req.DurationSeconds = 900
+	} else if req.DurationSeconds < 0 {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Duration must be non-negative")
+		return
+	}
 
-    body, err := json.Marshal(req)
-    if err != nil {
-        s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to encode request")
-        return
-    }
+	body, err := json.Marshal(req)
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to encode request")
+		return
+	}
 
-    reactorURL := s.config.ReactorBaseURL + "/api/v1/portal/trigger"
-    reactorReq, err := http.NewRequest(http.MethodPut, reactorURL, bytes.NewReader(body))
-    if err != nil {
-        s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to build reactor request")
-        return
-    }
-    reactorReq.Header.Set("Content-Type", "application/json")
+	reactorURL := s.config.ReactorBaseURL + "/api/v1/portal/trigger"
+	reactorReq, err := http.NewRequest(http.MethodPut, reactorURL, bytes.NewReader(body))
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to build reactor request")
+		return
+	}
+	reactorReq.Header.Set("Content-Type", "application/json")
 
-    resp, err := s.reactorClient.Do(reactorReq)
-    if err != nil {
-        s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
-        return
-    }
-    defer resp.Body.Close()
+	resp, err := s.reactorClient.Do(reactorReq)
+	if err != nil {
+		s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+		return
+	}
+	defer resp.Body.Close()
 
-    w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
-    w.WriteHeader(resp.StatusCode)
-    if _, err := io.Copy(w, resp.Body); err != nil {
-        log.Printf("Failed to forward reactor response: %v", err)
-    }
+	w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+	w.WriteHeader(resp.StatusCode)
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		log.Printf("Failed to forward reactor response: %v", err)
+	}
 }
 
 // =============================================================================
