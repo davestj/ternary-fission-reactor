@@ -57,6 +57,10 @@ web_root=webroot
 media_streaming_enabled=false
 ```
 
+## Environment Variables
+
+See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for default values, valid options, and usage examples.
+
 ## Running the Daemon and Dashboard
 
 ```bash
