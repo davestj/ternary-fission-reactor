@@ -45,7 +45,7 @@ make static-analysis # run static analysis
 # configs/ternary_fission.conf
 parent_mass=235.0
 excitation_energy=6.5
-web_root=web
+web_root=webroot
 media_streaming_enabled=false
 ```
 
@@ -86,6 +86,16 @@ open http://localhost:8080
 curl http://localhost:8333/index.html      # Fetch static test page
 curl http://localhost:8333/stream          # Stream media content
 ```
+
+### Web Dashboard Structure
+- **Atoms** (`web/atoms`): buttons, inputs, and shared styles
+- **Molecules** (`web/molecules`): login form and status cards
+- **Organisms** (`web/organisms`): navigation bar and metrics panel
+- **Templates** (`web/templates`): layout shells
+- **Pages** (`web/pages`): entry points `index.html` and `login.html`
+
+Set `web_root=webroot` so the C++ HTTP server serves the `webroot/` directory.
+Open `http://localhost:8333/login.html` to authenticate and reach the dashboard. The metrics panel polls `/api/v1/metrics` and management controls send commands such as `POST /api/v1/control/shutdown`.
 
 ### ⚠️ In Testing/Validation Phase
 - **WebSocket Monitoring**: Basic implementation, real-time validation ongoing
