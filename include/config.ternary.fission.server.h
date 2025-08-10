@@ -138,6 +138,16 @@ struct LoggingConfiguration {
 };
 
 /**
+ * We define media streaming configuration structure for external audio/video feeds
+ * This structure controls streaming tool invocation and media file locations
+ */
+struct MediaStreamingConfiguration {
+    bool media_streaming_enabled = false;      // Enable media streaming subsystem
+    std::string media_root;                    // Root directory for media files
+    std::string icecast_mount;                 // Target Icecast mount point
+};
+
+/**
  * We define the main configuration manager class for centralized parameter management
  * This class handles loading, parsing, validation, and runtime updates of all configuration
  */
@@ -155,6 +165,7 @@ private:
     SSLConfiguration ssl_config_;
     PhysicsConfiguration physics_config_;
     LoggingConfiguration logging_config_;
+    MediaStreamingConfiguration media_streaming_config_;
     
     // We track configuration validation status
     bool configuration_valid_ = false;
@@ -210,6 +221,7 @@ public:
     const SSLConfiguration& getSSLConfig() const;
     const PhysicsConfiguration& getPhysicsConfig() const;
     const LoggingConfiguration& getLoggingConfig() const;
+    const MediaStreamingConfiguration& getMediaStreamingConfig() const;
     
     /**
      * We provide methods to update specific configuration categories
@@ -267,6 +279,7 @@ private:
     bool parseSSLConfiguration();
     bool parsePhysicsConfiguration();
     bool parseLoggingConfiguration();
+    bool parseMediaStreamingConfiguration();
     
     /**
      * We implement configuration value parsing and type conversion
@@ -287,6 +300,7 @@ private:
     bool validateSSLConfiguration();
     bool validatePhysicsConfiguration();
     bool validateLoggingConfiguration();
+    bool validateMediaStreamingConfiguration();
     
     /**
      * We implement file system utility methods for configuration management

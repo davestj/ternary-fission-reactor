@@ -281,6 +281,12 @@ bool HTTPTernaryFissionServer::initialize() {
     bind_ip_ = network_config.bind_ip;
     bind_port_ = network_config.bind_port;
     ssl_enabled_ = network_config.enable_ssl;
+
+    // We setup media streaming manager if enabled
+    auto media_config = config_manager_->getMediaStreamingConfig();
+    if (media_config.media_streaming_enabled) {
+        media_streaming_manager_ = std::make_unique<MediaStreamingManager>(media_config.media_root, media_config.icecast_mount);
+    }
     
     std::cout << "HTTP server configured for " << bind_ip_ << ":" << bind_port_ 
               << (ssl_enabled_ ? " (HTTPS)" : " (HTTP)") << std::endl;
@@ -322,8 +328,16 @@ bool HTTPTernaryFissionServer::initialize() {
         server->set_file_extension_and_mimetype_mapping("json", "application/json");
         server->set_file_extension_and_mimetype_mapping("mp3", "audio/mpeg");
         server->set_file_extension_and_mimetype_mapping("ogg", "audio/ogg");
+        server->set_file_extension_and_mimetype_mapping("oga", "audio/ogg");
+        server->set_file_extension_and_mimetype_mapping("aac", "audio/aac");
+        server->set_file_extension_and_mimetype_mapping("flac", "audio/flac");
+        server->set_file_extension_and_mimetype_mapping("opus", "audio/opus");
         server->set_file_extension_and_mimetype_mapping("mp4", "video/mp4");
+        server->set_file_extension_and_mimetype_mapping("ogv", "video/ogg");
         server->set_file_extension_and_mimetype_mapping("webm", "video/webm");
+        server->set_file_extension_and_mimetype_mapping("weba", "audio/webm");
+        server->set_file_extension_and_mimetype_mapping("m3u", "audio/x-mpegurl");
+        server->set_file_extension_and_mimetype_mapping("pls", "audio/x-scpls");
         server->set_file_extension_and_mimetype_mapping("png", "image/png");
         server->set_file_extension_and_mimetype_mapping("jpg", "image/jpeg");
         server->set_file_extension_and_mimetype_mapping("jpeg", "image/jpeg");
@@ -416,9 +430,14 @@ void HTTPTernaryFissionServer::stop() {
     
     // We cleanup WebSocket connections
     cleanupWebSocketConnections();
-    
+
     // We shutdown physics engine integration
     shutdownPhysicsEngine();
+
+    // We stop media streaming if active
+    if (media_streaming_manager_) {
+        media_streaming_manager_->stopStreaming();
+    }
     
     std::cout << "HTTP server stopped successfully" << std::endl;
 }
@@ -615,7 +634,16 @@ void HTTPTernaryFissionServer::setupAPIEndpoints() {
     server->Post("/api/v1/simulation/reset", [this](const httplib::Request& req, httplib::Response& res) {
         this->handleSimulationReset(req, res);
     });
-    
+
+    // We setup media streaming control endpoints
+    server->Post("/api/v1/stream/start", [this](const httplib::Request& req, httplib::Response& res) {
+        this->handleStreamStart(req, res);
+    });
+
+    server->Post("/api/v1/stream/stop", [this](const httplib::Request& req, httplib::Response& res) {
+        this->handleStreamStop(req, res);
+    });
+
     // We setup physics calculation endpoints
     server->Post("/api/v1/physics/fission", [this](const httplib::Request& req, httplib::Response& res) {
         this->handleFissionCalculation(req, res);
@@ -1264,6 +1292,42 @@ void HTTPTernaryFissionServer::handleSimulationReset(const httplib::Request& /*r
         metrics_->incrementSuccessful();
     } catch (const std::exception& e) {
         sendErrorResponse(res, 500, std::string("Failed to reset simulation: ") + e.what());
+        metrics_->incrementErrors();
+    }
+}
+
+void HTTPTernaryFissionServer::handleStreamStart(const httplib::Request& /*req*/, httplib::Response& res) {
+    if (!media_streaming_manager_) {
+        sendErrorResponse(res, 400, "Media streaming not enabled");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    if (media_streaming_manager_->startStreaming()) {
+        Json::Value response;
+        response["status"] = "started";
+        sendJSONResponse(res, 200, response);
+        metrics_->incrementSuccessful();
+    } else {
+        sendErrorResponse(res, 500, "Failed to start media streaming");
+        metrics_->incrementErrors();
+    }
+}
+
+void HTTPTernaryFissionServer::handleStreamStop(const httplib::Request& /*req*/, httplib::Response& res) {
+    if (!media_streaming_manager_) {
+        sendErrorResponse(res, 400, "Media streaming not enabled");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    if (media_streaming_manager_->stopStreaming()) {
+        Json::Value response;
+        response["status"] = "stopped";
+        sendJSONResponse(res, 200, response);
+        metrics_->incrementSuccessful();
+    } else {
+        sendErrorResponse(res, 500, "Failed to stop media streaming");
         metrics_->incrementErrors();
     }
 }

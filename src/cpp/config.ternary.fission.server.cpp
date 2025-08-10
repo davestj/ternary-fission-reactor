@@ -55,6 +55,7 @@ ConfigurationManager::ConfigurationManager(const std::string& config_file_path)
     ssl_config_ = SSLConfiguration();
     physics_config_ = PhysicsConfiguration();
     logging_config_ = LoggingConfiguration();
+    media_streaming_config_ = MediaStreamingConfiguration();
     
     // We process environment variable overrides first
     processEnvironmentOverrides();
@@ -144,6 +145,7 @@ bool ConfigurationManager::validateConfiguration() {
     if (!validateSSLConfiguration()) all_valid = false;
     if (!validatePhysicsConfiguration()) all_valid = false;
     if (!validateLoggingConfiguration()) all_valid = false;
+    if (!validateMediaStreamingConfiguration()) all_valid = false;
     
     return all_valid;
 }
@@ -215,6 +217,7 @@ bool ConfigurationManager::parseConfigurationFile() {
     if (!parseSSLConfiguration()) return false;
     if (!parsePhysicsConfiguration()) return false;
     if (!parseLoggingConfiguration()) return false;
+    if (!parseMediaStreamingConfiguration()) return false;
     
     return true;
 }
@@ -318,7 +321,14 @@ bool ConfigurationManager::parseLoggingConfiguration() {
     logging_config_.enable_json_logging = getConfigBool("enable_json_logging", false);
     logging_config_.verbose_output = getConfigBool("verbose_output", false);
     logging_config_.log_timestamp_format = getConfigValue("log_timestamp_format", "%Y-%m-%d %H:%M:%S");
-    
+
+    return true;
+}
+
+bool ConfigurationManager::parseMediaStreamingConfiguration() {
+    media_streaming_config_.media_streaming_enabled = getConfigBool("media_streaming_enabled", false);
+    media_streaming_config_.media_root = getConfigValue("media_root", "");
+    media_streaming_config_.icecast_mount = getConfigValue("icecast_mount", "");
     return true;
 }
 
@@ -553,7 +563,28 @@ bool ConfigurationManager::validateLoggingConfiguration() {
         addValidationError("Invalid log rotation count: " + std::to_string(logging_config_.log_rotation_count));
         valid = false;
     }
-    
+
+    return valid;
+}
+
+bool ConfigurationManager::validateMediaStreamingConfiguration() {
+    bool valid = true;
+
+    if (media_streaming_config_.media_streaming_enabled) {
+        if (media_streaming_config_.media_root.empty()) {
+            addValidationError("Media streaming enabled but media_root not set");
+            valid = false;
+        } else if (!ConfigurationUtils::validateDirectoryPath(media_streaming_config_.media_root, false)) {
+            addValidationError("Media root directory does not exist: " + media_streaming_config_.media_root);
+            valid = false;
+        }
+
+        if (media_streaming_config_.icecast_mount.empty()) {
+            addValidationError("Media streaming enabled but icecast_mount not set");
+            valid = false;
+        }
+    }
+
     return valid;
 }
 
@@ -599,7 +630,7 @@ void ConfigurationManager::processEnvironmentOverrides() {
     if (!env_events_per_second.empty()) {
         physics_config_.events_per_second = std::stod(env_events_per_second);
     }
-    
+
     // We process logging configuration overrides
     std::string env_log_level = getEnvironmentVariable("TERNARY_LOG_LEVEL");
     if (!env_log_level.empty()) {
@@ -609,6 +640,22 @@ void ConfigurationManager::processEnvironmentOverrides() {
     std::string env_verbose_output = getEnvironmentVariable("TERNARY_VERBOSE_OUTPUT");
     if (!env_verbose_output.empty()) {
         logging_config_.verbose_output = (env_verbose_output == "true" || env_verbose_output == "1");
+    }
+
+    // We process media streaming overrides
+    std::string env_streaming_enabled = getEnvironmentVariable("TERNARY_MEDIA_STREAMING_ENABLED");
+    if (!env_streaming_enabled.empty()) {
+        media_streaming_config_.media_streaming_enabled = (env_streaming_enabled == "true" || env_streaming_enabled == "1");
+    }
+
+    std::string env_media_root = getEnvironmentVariable("TERNARY_MEDIA_ROOT");
+    if (!env_media_root.empty()) {
+        media_streaming_config_.media_root = env_media_root;
+    }
+
+    std::string env_icecast_mount = getEnvironmentVariable("TERNARY_ICECAST_MOUNT");
+    if (!env_icecast_mount.empty()) {
+        media_streaming_config_.icecast_mount = env_icecast_mount;
     }
 }
 
@@ -685,6 +732,11 @@ const PhysicsConfiguration& ConfigurationManager::getPhysicsConfig() const {
 const LoggingConfiguration& ConfigurationManager::getLoggingConfig() const {
     std::lock_guard<std::mutex> lock(config_mutex_);
     return logging_config_;
+}
+
+const MediaStreamingConfiguration& ConfigurationManager::getMediaStreamingConfig() const {
+    std::lock_guard<std::mutex> lock(config_mutex_);
+    return media_streaming_config_;
 }
 
 // We implement utility functions for configuration management
