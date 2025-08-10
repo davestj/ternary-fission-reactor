@@ -202,3 +202,5 @@ The following summary outlines documentation updates and feature changes for eac
 - 2025-08-10 [202a6a1] docs: expand README with build and run instructions
 - 2025-08-10 [cf05fa7] Merge pull request #93 from davestj/codex/update-readme.md-with-documentation-sections
 - 2025-08-10 [rc1docs] docs: document 2.0.0-rc1 release candidate and cross-link milestone docs
+- 2025-08-10 [release-strat] docs: document release strategy and branch workflow
+- 2025-08-10 [release-doc] docs: add release strategy document
