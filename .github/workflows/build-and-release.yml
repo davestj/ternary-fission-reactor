@@ -15,7 +15,9 @@ name: Build and Release Pipeline
 
 on:
   push:
-    branches: [ master, main, develop, dev ]
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
   workflow_dispatch:
 
 permissions:
