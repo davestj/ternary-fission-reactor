@@ -152,6 +152,8 @@ Json::Value SystemStatusResponse::toJson() const {
     json["simulation_running"] = simulation_running;
     json["cpu_usage_percent"] = cpu_usage_percent;
     json["memory_usage_percent"] = memory_usage_percent;
+    json["estimated_power_mev"] = estimated_power_mev;
+    json["portal_duration_remaining_seconds"] = portal_duration_remaining_seconds;
     
     // We add timestamp for response correlation
     auto now = std::chrono::system_clock::now();
@@ -804,6 +806,8 @@ SystemStatusResponse HTTPTernaryFissionServer::generateSystemStatus() const {
         // status.total_energy_simulated_mev = simulation_engine_->getTotalEnergySimulated();
         // status.total_calculations = simulation_engine_->getTotalCalculations();
         // status.average_calc_time_microseconds = simulation_engine_->getAverageCalculationTime();
+        simulation_engine_->getPortalEventState(status.estimated_power_mev,
+                                               status.portal_duration_remaining_seconds);
     }
     
     // We calculate system resource usage
@@ -1317,6 +1321,15 @@ void HTTPTernaryFissionServer::handlePortalTrigger(const httplib::Request& req, 
         duration = 900.0;
     }
     double power = body.get("power_level_mev", 0.0).asDouble();
+    double extra = body.get("additional_power_mev", 0.0).asDouble();
+
+    double estimated = calculateEstimatedPower(power, static_cast<int>(duration), extra);
+    double extension = 1.0;
+    if (power > 0.0 && extra > 0.0) {
+        extension += extra / power;
+    }
+    double adjusted_duration = duration * extension;
+    double total_power = power + extra;
 
     {
         std::lock_guard<std::mutex> lock(simulation_mutex_);
@@ -1325,12 +1338,15 @@ void HTTPTernaryFissionServer::handlePortalTrigger(const httplib::Request& req, 
             metrics_->incrementErrors();
             return;
         }
-        simulation_engine_->startPortalLoad(duration, power);
+        simulation_engine_->startPortalLoad(adjusted_duration, total_power);
+        auto start = std::chrono::system_clock::now();
+        auto end = start + std::chrono::seconds(static_cast<int>(adjusted_duration));
+        simulation_engine_->setPortalEventState(start, end, estimated);
     }
 
     Json::Value ack;
-    ack["scheduled_duration_seconds"] = duration;
-    ack["projected_power_level_mev"] = power;
+    ack["scheduled_duration_seconds"] = adjusted_duration;
+    ack["projected_power_level_mev"] = total_power;
 
     sendJSONResponse(res, 200, ack);
     metrics_->incrementSuccessful();

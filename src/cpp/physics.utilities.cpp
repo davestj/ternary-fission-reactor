@@ -787,4 +787,17 @@ int poissonRandom(double lambda) {
     return dist(tl_rng);
 }
 
+/*
+ * Calculate projected power usage with duration extension
+ * We increase duration proportionally to additional power
+ */
+double calculateEstimatedPower(double power_level_mev, int duration_seconds, double additional_power) {
+    double duration = static_cast<double>(duration_seconds);
+    if (power_level_mev > 0.0 && additional_power > 0.0) {
+        duration *= 1.0 + (additional_power / power_level_mev);
+    }
+    double total_power = power_level_mev + additional_power;
+    return total_power * duration;
+}
+
 } // namespace TernaryFission

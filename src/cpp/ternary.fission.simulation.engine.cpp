@@ -601,6 +601,29 @@ void TernaryFissionSimulationEngine::startPortalLoad(double duration_seconds, do
     }).detach();
 }
 
+void TernaryFissionSimulationEngine::setPortalEventState(
+    std::chrono::system_clock::time_point start,
+    std::chrono::system_clock::time_point end,
+    double estimated_power_mev) {
+    std::lock_guard<std::mutex> lock(state_mutex);
+    portal_start_time_ = start;
+    portal_end_time_ = end;
+    portal_estimated_power_mev_ = estimated_power_mev;
+}
+
+void TernaryFissionSimulationEngine::getPortalEventState(
+    double& estimated_power_mev, int& remaining_seconds) const {
+    std::lock_guard<std::mutex> lock(state_mutex);
+    estimated_power_mev = portal_estimated_power_mev_;
+    auto now = std::chrono::system_clock::now();
+    if (now >= portal_end_time_) {
+        remaining_seconds = 0;
+    } else {
+        remaining_seconds = static_cast<int>(
+            std::chrono::duration_cast<std::chrono::seconds>(portal_end_time_ - now).count());
+    }
+}
+
 /*
  * Get total events simulated
  */

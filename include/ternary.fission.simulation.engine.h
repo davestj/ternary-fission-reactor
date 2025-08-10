@@ -125,6 +125,21 @@ public:
      */
     void startPortalLoad(double duration_seconds, double power_level_mev);
 
+    /**
+     * Store current portal event state
+     * We record timing and estimated power for status queries
+     */
+    void setPortalEventState(std::chrono::system_clock::time_point start,
+                             std::chrono::system_clock::time_point end,
+                             double estimated_power_mev);
+
+    /**
+     * Get current portal event state
+     * We provide estimated power and remaining duration
+     */
+    void getPortalEventState(double& estimated_power_mev,
+                             int& remaining_seconds) const;
+
     Json::Value startContinuousSimulationAPI(const Json::Value& request);
     Json::Value stopContinuousSimulationAPI();
     Json::Value getSystemStatusAPI() const;
@@ -217,6 +232,11 @@ private:
     std::mutex queue_mutex;
     std::condition_variable queue_cv;
     std::queue<TernaryFissionEvent> event_queue;
+
+    // Portal event state tracking
+    std::chrono::system_clock::time_point portal_start_time_;
+    std::chrono::system_clock::time_point portal_end_time_;
+    double portal_estimated_power_mev_ = 0.0;
 
     /**
      * Serialize fission event to JSON
