@@ -47,13 +47,13 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus"
-        "github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
-    Version   = "dev"
-    BuildDate = "unknown"
-    GitCommit = "unknown"
+	Version   = "dev"
+	BuildDate = "unknown"
+	GitCommit = "unknown"
 )
 
 // =============================================================================
@@ -689,6 +689,22 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
             text-align: center;
         }
 
+        .portal-trigger {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+
+        .portal-trigger h2 {
+            font-size: 14px;
+            color: #2196f3;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
         .form-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -1041,6 +1057,27 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
             <div id="field-response" class="response-area"></div>
         </div>
 
+        <div class="portal-trigger">
+            <h2>🌀 Trigger Portal</h2>
+            <p style="text-align: center; color: #b0bec5; margin-bottom: 20px; font-size: 11px;">
+                Initiate a transient portal event with specified duration and power level.
+            </p>
+            <form id="portal-trigger-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="portal-duration">Duration (minutes):</label>
+                        <input type="number" id="portal-duration" min="1" value="15" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="portal-power">Power Level:</label>
+                        <input type="number" id="portal-power" min="0.1" step="0.1" value="1" required>
+                    </div>
+                </div>
+                <button type="submit" class="submit-btn">🌀 Trigger Portal</button>
+            </form>
+            <div id="portal-response" class="response-area"></div>
+        </div>
+
         <div class="api-documentation">
             <h2>📡 API Documentation & Testing Interface</h2>
             <p style="text-align: center; color: #b0bec5; margin-bottom: 20px; font-size: 11px;">
@@ -1139,6 +1176,7 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
             updateEnergyFields();
             startStatusUpdates();
             setupEnergyFieldForm();
+            setupPortalTriggerForm();
             initializeEnergyVisualization();
             console.log('✅ Dashboard fully loaded and operational');
         });
@@ -1353,6 +1391,47 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
                 .catch(error => {
                     console.error('❌ Error creating energy field:', error);
                     const responseArea = document.getElementById('field-response');
+                    responseArea.innerHTML = '<strong>❌ Error:</strong> ' + error.message;
+                    responseArea.style.display = 'block';
+                });
+            });
+        }
+
+        // We set up the portal trigger form
+        function setupPortalTriggerForm() {
+            const form = document.getElementById('portal-trigger-form');
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                console.log('🌌 Triggering portal...');
+
+                const formData = {
+                    duration_minutes: parseInt(document.getElementById('portal-duration').value),
+                    power_level: parseFloat(document.getElementById('portal-power').value)
+                };
+
+                fetch('/api/v1/portal/trigger', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to trigger portal: ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('🌠 Portal triggered:', data);
+                    const responseArea = document.getElementById('portal-response');
+                    responseArea.innerHTML = '<strong>✅ Portal triggered successfully!</strong><br><pre>' +
+                        JSON.stringify(data, null, 2) + '</pre>';
+                    responseArea.style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('❌ Error triggering portal:', error);
+                    const responseArea = document.getElementById('portal-response');
                     responseArea.innerHTML = '<strong>❌ Error:</strong> ' + error.message;
                     responseArea.style.display = 'block';
                 });
@@ -1893,13 +1972,13 @@ func (s *TernaryFissionAPIServer) healthCheck(w http.ResponseWriter, r *http.Req
 	}
 	resp.Body.Close()
 
-        health := map[string]interface{}{
-                "status":               "healthy",
-                "timestamp":            time.Now().Format(time.RFC3339),
-                "uptime_seconds":       int64(uptime.Seconds()),
-                "active_energy_fields": status.ActiveEnergyFields,
-                "version":              Version,
-        }
+	health := map[string]interface{}{
+		"status":               "healthy",
+		"timestamp":            time.Now().Format(time.RFC3339),
+		"uptime_seconds":       int64(uptime.Seconds()),
+		"active_energy_fields": status.ActiveEnergyFields,
+		"version":              Version,
+	}
 
 	s.writeJSONResponse(w, http.StatusOK, health)
 }
@@ -1974,7 +2053,7 @@ func main() {
 
 	log.Println("=== Ternary Fission Energy Emulation API Server ===")
 	log.Printf("Author: bthlops (David StJ)")
-        log.Printf("Version: %s", Version)
+	log.Printf("Version: %s", Version)
 	log.Printf("Starting server on port %d", config.APIPort)
 	log.Printf("🌐 Web Dashboard: http://localhost:%d/", config.APIPort)
 	log.Printf("📡 API Documentation: http://localhost:%d/api/v1", config.APIPort)
