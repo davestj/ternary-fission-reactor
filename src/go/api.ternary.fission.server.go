@@ -433,6 +433,7 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ternary Fission Energy Emulation System - Beyond The Horizon Labs</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
             margin: 0;
@@ -775,6 +776,22 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
             display: none;
         }
 
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .chart-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            backdrop-filter: blur(5px);
+        }
+
         .footer {
             text-align: center;
             padding: 20px;
@@ -894,6 +911,10 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
                     <span class="metric-label">Avg Calculation Time:</span>
                     <span class="metric-value" id="avg-calc-time">Loading...</span>
                 </div>
+                <div class="metric">
+                    <span class="metric-label">Event Rate:</span>
+                    <span class="metric-value" id="event-rate">Loading...</span>
+                </div>
             </div>
 
             <div class="status-card">
@@ -914,6 +935,18 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
                     <span class="metric-label">Max Energy Field:</span>
                     <span class="metric-value">{{.Config.MaxEnergyField}} MeV</span>
                 </div>
+            </div>
+        </div>
+
+        <div class="chart-grid">
+            <div class="chart-card">
+                <canvas id="energyChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <canvas id="resourceChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <canvas id="eventChart"></canvas>
             </div>
         </div>
 
@@ -1045,11 +1078,18 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
         // We implement comprehensive dashboard functionality
         let statusUpdateInterval;
         let energyBarAnimation;
+        let energyChart;
+        let resourceChart;
+        let eventChart;
+        let lastEventCount = 0;
+        let lastEventTime = Date.now();
 
         // We initialize the dashboard when page loads
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Ternary Fission Dashboard Loading...');
+            initializeCharts();
             updateSystemStatus();
+            updateEnergyFields();
             startStatusUpdates();
             setupEnergyFieldForm();
             initializeEnergyVisualization();
@@ -1070,13 +1110,32 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
 
                     // We update all status displays
                     document.getElementById('uptime').textContent = formatUptime(data.uptime_seconds);
-                    document.getElementById('active-fields').textContent = data.active_energy_fields;
                     document.getElementById('total-energy').textContent = data.total_energy_simulated.toFixed(2) + ' MeV';
                     document.getElementById('simulation-running').textContent = data.simulation_running ? 'Active' : 'Idle';
                     document.getElementById('cpu-usage').textContent = data.cpu_usage_percent.toFixed(1) + '%';
                     document.getElementById('memory-usage').textContent = data.memory_usage_percent.toFixed(1) + '%';
                     document.getElementById('peak-memory').textContent = formatBytes(data.peak_memory_usage_bytes);
                     document.getElementById('avg-calc-time').textContent = data.average_calculation_time_microseconds.toFixed(1) + ' μs';
+                    const now = new Date();
+                    const label = now.toLocaleTimeString();
+                    const deltaEvents = data.total_fission_events - lastEventCount;
+                    const deltaTime = (now.getTime() - lastEventTime) / 1000;
+                    const eventRate = deltaTime > 0 ? deltaEvents / deltaTime : 0;
+                    lastEventCount = data.total_fission_events;
+                    lastEventTime = now.getTime();
+                    document.getElementById('event-rate').textContent = eventRate.toFixed(2) + ' events/s';
+
+                    energyChart.data.labels.push(label);
+                    energyChart.data.datasets[0].data.push(data.total_energy_simulated);
+                    energyChart.update();
+
+                    resourceChart.data.labels.push(label);
+                    resourceChart.data.datasets[0].data.push(data.cpu_usage_percent);
+                    resourceChart.data.datasets[1].data.push(data.memory_usage_percent);
+                    resourceChart.update();
+
+                    eventChart.data.labels.push(label);
+                    eventChart.data.datasets[1].data.push(eventRate);
 
                     // We update connection status
                     const statusElement = document.getElementById('server-status');
@@ -1101,8 +1160,110 @@ const enhancedDashboardHTML = `<!DOCTYPE html>
 
         // We start periodic status updates with configurable interval
         function startStatusUpdates() {
-            statusUpdateInterval = setInterval(updateSystemStatus, 3000); // Update every 3 seconds
+            statusUpdateInterval = setInterval(function() {
+                updateSystemStatus();
+                updateEnergyFields();
+            }, 3000); // Update every 3 seconds
             console.log('⏰ Status updates started (3s interval)');
+        }
+
+        // We fetch energy field information and update charts
+        function updateEnergyFields() {
+            fetch('/api/v1/energy-fields')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok: ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(fields => {
+                    const count = Array.isArray(fields) ? fields.length : 0;
+                    document.getElementById('active-fields').textContent = count;
+                    eventChart.data.datasets[0].data.push(count);
+                    eventChart.update();
+                })
+                .catch(error => {
+                    console.error('❌ Failed to fetch energy fields:', error);
+                });
+        }
+
+        // We initialize Chart.js visualizations
+        function initializeCharts() {
+            const ctxEnergy = document.getElementById('energyChart').getContext('2d');
+            energyChart = new Chart(ctxEnergy, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Total Energy (MeV)',
+                        borderColor: '#ffd54f',
+                        backgroundColor: 'rgba(255,213,79,0.2)',
+                        data: [],
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+
+            const ctxResource = document.getElementById('resourceChart').getContext('2d');
+            resourceChart = new Chart(ctxResource, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'CPU Usage %',
+                            borderColor: '#64b5f6',
+                            backgroundColor: 'rgba(100,181,246,0.2)',
+                            data: [],
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Memory Usage %',
+                            borderColor: '#81c784',
+                            backgroundColor: 'rgba(129,199,132,0.2)',
+                            data: [],
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    scales: { y: { beginAtZero: true, max: 100 } }
+                }
+            });
+
+            const ctxEvent = document.getElementById('eventChart').getContext('2d');
+            eventChart = new Chart(ctxEvent, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Active Fields',
+                            borderColor: '#f06292',
+                            backgroundColor: 'rgba(240,98,146,0.2)',
+                            data: [],
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Event Rate (events/s)',
+                            borderColor: '#ba68c8',
+                            backgroundColor: 'rgba(186,104,200,0.2)',
+                            data: [],
+                            tension: 0.3,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    scales: {
+                        y: { beginAtZero: true, position: 'left' },
+                        y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } }
+                    }
+                }
+            });
         }
 
         // We set up the energy field creation form with validation
