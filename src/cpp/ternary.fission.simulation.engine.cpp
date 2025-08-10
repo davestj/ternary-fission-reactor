@@ -63,6 +63,14 @@
 namespace TernaryFission {
 
 /*
+ * Create an energy field with specified energy
+ * We allocate computational resources to represent energy
+ */
+EnergyField TernaryFissionSimulationEngine::createEnergyField(double energy_mev) {
+    return ::TernaryFission::createEnergyField(energy_mev);
+}
+
+/*
  * Default constructor implementation
  * We use standard U-235 fission parameters
  */
@@ -337,14 +345,6 @@ Json::Value TernaryFissionSimulationEngine::stopContinuousSimulationAPI() {
     response["simulation_running"] = false;
 
     return response;
-}
-
-/*
- * Create an energy field with specified energy
- * We allocate computational resources to represent energy
- */
-EnergyField TernaryFissionSimulationEngine::createEnergyField(double energy_mev) {
-    return TernaryFission::createEnergyField(energy_mev);
 }
 
 /*
