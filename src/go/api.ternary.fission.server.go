@@ -94,7 +94,7 @@ func defaultConfig() *Config {
 		APITimeout:               30,
 		MaxRequestSize:           10485760,
 		MaxConcurrentConnections: 1000,
-		ReactorBaseURL:           "http://localhost:8333",
+		ReactorBaseURL:           "http://127.0.0.1:8333",
 		WebSocketEnabled:         true,
 		WebSocketBufferSize:      4096,
 		WebSocketTimeout:         300,
@@ -161,6 +161,7 @@ func parseConfigFile(filename string) (*Config, error) {
 		case "api_host":
 			config.APIHost = value
 		case "reactor_base_url":
+			// Base URL for the backing reactor service
 			config.ReactorBaseURL = value
 		case "events_per_second":
 			if eps, err := strconv.ParseFloat(value, 64); err == nil {
