@@ -71,6 +71,16 @@ See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for default values, valid options
 open http://localhost:8080
 ```
 
+## Clustering & Load Balancing
+
+The daemon layer scales horizontally using an eight-node ring topology. Nodes are numbered `node0` through `node7`, each maintaining a persistent connection to its immediate neighbors. Workloads are sharded with `shard = hash(task_id) % 8` and routed to the node owning that shard.
+
+- Each node owns one primary shard and serves as standby for its predecessor's shard
+- Neighbor heartbeats detect failures and trigger automatic shard reassignment
+- Recovery reintegrates the node and rebalances shards across the ring
+
+This strategy provides even load distribution while ensuring any single node failure is absorbed by the remaining ring without service interruption.
+
 ## 📊 Current Development Status (v1.1.15-alpha)
 
 ### ✅ Fully Working Components
