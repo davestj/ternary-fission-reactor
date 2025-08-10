@@ -376,6 +376,19 @@ Json::Value TernaryFissionSimulationEngine::createEnergyFieldAPI(const Json::Val
 }
 
 /*
+ * Dissipate energy from an existing field
+ * We apply physics utility dissipation for the specified rounds
+ */
+void TernaryFissionSimulationEngine::dissipateEnergyField(EnergyField& field, int rounds) {
+    for (int i = 0; i < rounds; ++i) {
+        ::TernaryFission::dissipateEnergyField(field);
+        if (field.energy_mev <= 0.0) {
+            break;
+        }
+    }
+}
+
+/*
  * Serialize fission event to JSON format
  * We convert physics data structures to JSON for HTTP API
  */
@@ -821,7 +834,7 @@ void TernaryFissionSimulationEngine::updateEnergyFields() {
     auto it = simulation_state.active_energy_fields.begin();
     while (it != simulation_state.active_energy_fields.end()) {
         // Apply dissipation using physics utilities
-        ::TernaryFission::dissipateEnergyField(*it);
+        dissipateEnergyField(*it, 1);
 
         // Remove fields with very low energy
         if (it->energy_mev < 0.001) {
