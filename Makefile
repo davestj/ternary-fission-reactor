@@ -68,10 +68,10 @@ ARCH := $(shell uname -m)
 PLATFORM := unknown
 
 ifeq ($(UNAME), Darwin)
-        PLATFORM := macos
-        HOMEBREW_PREFIX := $(shell brew --prefix)
-        OPENSSL_PREFIX := $(HOMEBREW_PREFIX)/opt/openssl@3
-        JSONCPP_PREFIX := $(HOMEBREW_PREFIX)/opt/jsoncpp
+	PLATFORM := macos
+	HOMEBREW_PREFIX := $(shell brew --prefix)
+	OPENSSL_PREFIX := $(HOMEBREW_PREFIX)/opt/openssl@3
+	JSONCPP_PREFIX := $(HOMEBREW_PREFIX)/opt/jsoncpp
 endif
 
 ifeq ($(UNAME), Linux)
@@ -96,12 +96,12 @@ LDFLAGS :=
 LIBS := -lm -lpthread
 
 ifeq ($(PLATFORM), macos)
-        CXXFLAGS += -DMACOS
-        CFLAGS += -DMACOS
-        CXXFLAGS += -I$(OPENSSL_PREFIX)/include -I$(JSONCPP_PREFIX)/include
-        LDFLAGS += -L$(OPENSSL_PREFIX)/lib -L$(JSONCPP_PREFIX)/lib
-        LIBS += -lssl -lcrypto -ljsoncpp -framework Security -framework CoreFoundation -lproc
-        CXXFLAGS += -DCPPHTTPLIB_OPENSSL_SUPPORT
+	CXXFLAGS += -DMACOS
+	CFLAGS += -DMACOS
+	CXXFLAGS += -I$(OPENSSL_PREFIX)/include -I$(JSONCPP_PREFIX)/include
+	LDFLAGS += -L$(OPENSSL_PREFIX)/lib -L$(JSONCPP_PREFIX)/lib
+	LIBS += -lssl -lcrypto -ljsoncpp -framework Security -framework CoreFoundation -lproc
+	CXXFLAGS += -DCPPHTTPLIB_OPENSSL_SUPPORT
 endif
 
 
@@ -120,11 +120,11 @@ ifeq ($(PLATFORM),macos)
 else
     RELEASE_FLAGS := $(COMMON_FLAGS) -O3 -DNDEBUG -march=native -flto
     ifeq ($(PLATFORM), linux)
-        CXXFLAGS += $(shell pkg-config --cflags openssl jsoncpp)
-        LDFLAGS += $(shell pkg-config --libs openssl jsoncpp)
-        CXXFLAGS += -DLINUX
-        CFLAGS += -DLINUX
-        CXXFLAGS += -DCPPHTTPLIB_OPENSSL_SUPPORT
+	CXXFLAGS += $(shell pkg-config --cflags openssl jsoncpp)
+	LDFLAGS += $(shell pkg-config --libs openssl jsoncpp)
+	CXXFLAGS += -DLINUX
+	CFLAGS += -DLINUX
+	CXXFLAGS += -DCPPHTTPLIB_OPENSSL_SUPPORT
 
     endif
 
@@ -154,8 +154,9 @@ GO_SOURCES := $(wildcard $(SRC_DIR)/go/*.go)
 
 # Object files (exclude main file to avoid multiple definitions)
 CPP_OBJS := $(patsubst %.cpp,$(BUILD_SUBDIR)/%.o,\
-             $(filter-out main.ternary.fission.application.cpp,\
-             $(notdir $(wildcard $(SRC_DIR)/cpp/*.cpp))))
+	     $(filter-out main.ternary.fission.application.cpp,\
+	     $(notdir $(wildcard $(SRC_DIR)/cpp/*.cpp))))
+MAIN_OBJ := $(BUILD_SUBDIR)/main.ternary.fission.application.o
 
 CPP_MAIN := $(BIN_DIR)/$(PROJECT_NAME)
 GO_BINARY := $(BIN_DIR)/ternary-api
@@ -189,16 +190,16 @@ info:
 
 
 # Link main executable
-$(CPP_MAIN): $(CPP_OBJS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp | $(BIN_DIR)
+$(CPP_MAIN): $(CPP_OBJS) $(MAIN_OBJ) | $(BIN_DIR)
 ifeq ($(BUILD_TYPE),debug)
 	@echo "Building C++ simulation engine (DEBUG)..."
-	$(CXX) $(DEBUG_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) -o $@ $(LDFLAGS)
+	$(CXX) $(DEBUG_FLAGS) $(VERSION_FLAGS) $(CPP_OBJS) $(MAIN_OBJ) -o $@ $(LDFLAGS) $(LIBS)
 else ifeq ($(BUILD_TYPE),profile)
 	@echo "Building C++ simulation engine (PROFILE)..."
-	$(CXX) $(PROFILE_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) -o $@ $(LDFLAGS)
+	$(CXX) $(PROFILE_FLAGS) $(VERSION_FLAGS) $(CPP_OBJS) $(MAIN_OBJ) -o $@ $(LDFLAGS) $(LIBS)
 else
 	@echo "Building C++ simulation engine (RELEASE)..."
-	$(CXX) $(RELEASE_FLAGS) $(VERSION_FLAGS) $(SRC_DIR)/cpp/main.ternary.fission.application.cpp $(CPP_OBJS) -o $@ $(LDFLAGS)
+	$(CXX) $(RELEASE_FLAGS) $(VERSION_FLAGS) $(CPP_OBJS) $(MAIN_OBJ) -o $@ $(LDFLAGS) $(LIBS)
 endif
 	@echo "C++ build complete: $@"
 
