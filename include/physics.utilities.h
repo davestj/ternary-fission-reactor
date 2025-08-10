@@ -120,9 +120,8 @@ void allocateEnergyField(EnergyField& field, double energy_mev);
  * We model energy loss through computational work
  *
  * @param field: Energy field to dissipate
- * @param rounds: Number of encryption rounds to perform
  */
-void dissipateEnergyField(EnergyField& field, int rounds);
+void dissipateEnergyField(EnergyField& field);
 
 /*
  * Generate random momentum for a fission fragment

@@ -268,7 +268,7 @@ namespace TernaryFission {
     bool verifyEnergyConservation(const TernaryFissionEvent& event, double tolerance = 1e-3);
 
     void allocateEnergyField(EnergyField& field, double energy_mev);
-    void dissipateEnergyField(EnergyField& field, int encryption_rounds);
+    void dissipateEnergyField(EnergyField& field);
 
     // We provide random number generation for physics simulation
     double generateGaussianRandom(SimulationState& state, double mean, double sigma);
