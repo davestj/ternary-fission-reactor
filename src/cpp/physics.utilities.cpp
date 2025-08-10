@@ -733,12 +733,12 @@ bool validateEnergyField(const EnergyField& field) {
  * Calculate total system energy
  * We sum all energy in active fields
  */
-double calculateTotalSystemEnergy(const std::vector<EnergyField*>& fields) {
+double calculateTotalSystemEnergy(const std::vector<EnergyField>& fields) {
     double total_energy = 0.0;
 
-    for (const auto* field : fields) {
-        if (field && validateEnergyField(*field)) {
-            total_energy += field->energy_mev;
+    for (const auto& field : fields) {
+        if (validateEnergyField(field)) {
+            total_energy += field.energy_mev;
         }
     }
 

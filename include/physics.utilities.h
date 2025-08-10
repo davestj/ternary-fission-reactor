@@ -326,10 +326,10 @@ bool validateEnergyField(const EnergyField& field);
  * Calculate total system energy
  * We sum all energy in active fields
  *
- * @param fields: Vector of energy field pointers
- * @return: Total energy in MeV
- */
-double calculateTotalSystemEnergy(const std::vector<EnergyField*>& fields);
+ * @param fields: Vector of energy fields
+* @return: Total energy in MeV
+*/
+double calculateTotalSystemEnergy(const std::vector<EnergyField>& fields);
 
 /*
  * Physics calculation helpers
