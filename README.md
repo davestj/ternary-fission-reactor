@@ -101,6 +101,7 @@ curl http://localhost:8333/stream          # Stream media content
 
 ## Related Documentation
 
+- [CHANGELOG.md](CHANGELOG.md) - Project changes
 - [HOW-TO.md](HOW-TO.md) - Complete usage guide with examples from basic to extreme simulations
 - [TESTING.md](TESTING.md) - Docker testing procedures and verification commands
 - [NEXT-STEPS.md](NEXT-STEPS.md) - Development roadmap and technical debt analysis
