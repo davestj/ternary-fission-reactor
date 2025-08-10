@@ -340,6 +340,14 @@ Json::Value TernaryFissionSimulationEngine::stopContinuousSimulationAPI() {
 }
 
 /*
+ * Create an energy field with specified energy
+ * We allocate computational resources to represent energy
+ */
+EnergyField TernaryFissionSimulationEngine::createEnergyField(double energy_mev) {
+    return TernaryFission::createEnergyField(energy_mev);
+}
+
+/*
  * HTTP API: Create energy field
  * We provide HTTP endpoint to create energy fields
  */
@@ -355,7 +363,7 @@ Json::Value TernaryFissionSimulationEngine::createEnergyFieldAPI(const Json::Val
     }
 
     try {
-        auto field = createEnergyField(energy_mev);
+        EnergyField field = createEnergyField(energy_mev);
         std::lock_guard<std::mutex> lock(state_mutex);
         simulation_state.active_energy_fields.push_back(field);
         total_energy_fields_created.fetch_add(1, std::memory_order_relaxed);
@@ -739,7 +747,7 @@ TernaryFissionEvent TernaryFissionSimulationEngine::generateFissionEvent(double 
 void TernaryFissionSimulationEngine::processFissionEvent(const TernaryFissionEvent& event) {
     // Create energy field based on event
     try {
-        auto energy_field = createEnergyField(event.total_kinetic_energy);
+        EnergyField energy_field = createEnergyField(event.total_kinetic_energy);
         energy_field.field_id = event.energy_field_id;
 
         {

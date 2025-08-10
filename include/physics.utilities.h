@@ -132,6 +132,15 @@ void dissipateEnergyField(EnergyField& field);
 void generateRandomMomentum(FissionFragment& fragment);
 
 /*
+ * Create an energy field from kinetic energy
+ * We map kinetic energy to memory and CPU usage
+ *
+ * @param energy_mev: Energy level in MeV to allocate
+ * @return: Initialized energy field structure
+ */
+EnergyField createEnergyField(double energy_mev);
+
+/*
  * Apply conservation laws to a fission event
  * We adjust fragment properties to ensure conservation
  *

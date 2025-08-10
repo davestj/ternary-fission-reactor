@@ -49,7 +49,7 @@
 #include <mutex>
 #include <atomic>
 #include <chrono>
-#include <memory>
+#include <cstdlib>
 
 // OpenSSL includes for encryption and hashing
 #include <openssl/evp.h>
@@ -455,40 +455,40 @@ void generateRandomMomentum(FissionFragment& fragment) {
  * Create an energy field from kinetic energy
  * We map kinetic energy to memory and CPU usage
  */
-std::shared_ptr<EnergyField> createEnergyField(double energy_mev) {
-    auto field = std::make_shared<EnergyField>();
+EnergyField createEnergyField(double energy_mev) {
+    EnergyField field{};
 
     // Generate unique field ID
     static std::atomic<uint64_t> field_id_counter{1};
-    field->field_id = field_id_counter.fetch_add(1, std::memory_order_relaxed);
+    field.field_id = field_id_counter.fetch_add(1, std::memory_order_relaxed);
 
-    field->energy_mev = energy_mev;
-    field->creation_time = std::chrono::high_resolution_clock::now();
+    field.energy_mev = energy_mev;
+    field.creation_time = std::chrono::high_resolution_clock::now();
 
     // Map energy to memory and CPU
-    field->memory_bytes = static_cast<size_t>(energy_mev * g_energy_field_config.memory_per_mev);
-    field->cpu_cycles = static_cast<uint64_t>(energy_mev * g_energy_field_config.cpu_cycles_per_mev);
+    field.memory_bytes = static_cast<size_t>(energy_mev * g_energy_field_config.memory_per_mev);
+    field.cpu_cycles = static_cast<uint64_t>(energy_mev * g_energy_field_config.cpu_cycles_per_mev);
 
     // Calculate entropy
-    field->entropy_factor = calculateEntropy(field->memory_bytes, field->cpu_cycles);
+    field.entropy_factor = calculateEntropy(field.memory_bytes, field.cpu_cycles);
 
     // Set field properties
-    field->dissipation_rate = g_energy_field_config.dissipation_rate_default;
-    field->stability_factor = 1.0 - field->entropy_factor;
-    field->interaction_strength = energy_mev / 1000.0;  // Normalized
+    field.dissipation_rate = g_energy_field_config.dissipation_rate_default;
+    field.stability_factor = 1.0 - field.entropy_factor;
+    field.interaction_strength = energy_mev / 1000.0;  // Normalized
 
     // Allocate memory for energy field
-    if (g_energy_field_config.use_memory_pool && field->memory_bytes > 0) {
+    if (g_energy_field_config.use_memory_pool && field.memory_bytes > 0) {
         try {
-            field->memory_ptr = std::malloc(field->memory_bytes);
-            if (field->memory_ptr) {
+            field.memory_ptr = std::malloc(field.memory_bytes);
+            if (field.memory_ptr) {
                 // Initialize memory with encrypted pattern
-                encryptMemoryPattern(field->memory_ptr, field->memory_bytes, field->field_id);
+                encryptMemoryPattern(field.memory_ptr, field.memory_bytes, field.field_id);
             }
         } catch (const std::exception& e) {
             std::cerr << "Memory allocation failed for energy field: " << e.what() << std::endl;
-            field->memory_ptr = nullptr;
-            field->memory_bytes = 0;
+            field.memory_ptr = nullptr;
+            field.memory_bytes = 0;
         }
     }
 
