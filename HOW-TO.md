@@ -529,6 +529,8 @@ docker-compose exec ternary-fission-app /app/bin/ternary-api -config /app/config
 ```
 
 ### Environment Variables
+
+See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for default values and available settings.
 ```bash
 # Set environment overrides for Docker
 export TERNARY_THREADS=32
