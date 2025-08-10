@@ -25,7 +25,7 @@
 
 ARG BUILD_DATE
 ARG GIT_COMMIT
-ARG VERSION=1.1.13
+ARG VERSION=2.0.0-rc1
 
 # =============================================================================
 # BUILD STAGE 1: C++ COMPILATION ENVIRONMENT

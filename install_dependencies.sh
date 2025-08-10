@@ -3,7 +3,7 @@
 # Author: David St. John (davestj@gmail.com)
 # Date: 2025-07-31
 # Purpose: Install build dependencies for Ternary Fission Reactor project
-# Version: 1.1.13
+# Version: 2.0.0-rc1
 #
 # Change Log:
 # - 2025-07-31: Initial cross-platform dependency installation script

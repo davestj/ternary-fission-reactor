@@ -1967,7 +1967,7 @@ func main() {
 
 	log.Println("=== Ternary Fission Energy Emulation API Server ===")
 	log.Printf("Author: bthlops (David StJ)")
-	log.Printf("Version: 1.1.13")
+        log.Printf("Version: 2.0.0-rc1")
 	log.Printf("Starting server on port %d", config.APIPort)
 	log.Printf("🌐 Web Dashboard: http://localhost:%d/", config.APIPort)
 	log.Printf("📡 API Documentation: http://localhost:%d/api/v1", config.APIPort)
