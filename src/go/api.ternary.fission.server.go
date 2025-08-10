@@ -26,27 +26,28 @@
 package main
 
 import (
-	"bufio"
-	"context"
-	"encoding/json"
-	"flag"
-	"fmt"
-	"html/template"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"strconv"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"syscall"
-	"time"
+    "bufio"
+    "bytes"
+    "context"
+    "encoding/json"
+    "flag"
+    "fmt"
+    "html/template"
+    "io"
+    "log"
+    "net/http"
+    "os"
+    "os/signal"
+    "strconv"
+    "strings"
+    "sync"
+    "syscall"
+    "time"
 
-	"github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+    "github.com/gorilla/mux"
+    "github.com/gorilla/websocket"
+    "github.com/prometheus/client_golang/prometheus"
+    "github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // =============================================================================
@@ -55,12 +56,13 @@ import (
 
 // We define the configuration structure to hold all settings
 type Config struct {
-	// API Server settings
-	APIPort                  int    `config:"api_port"`
-	APIHost                  string `config:"api_host"`
-	APITimeout               int    `config:"api_timeout"`
-	MaxRequestSize           int64  `config:"max_request_size"`
-	MaxConcurrentConnections int    `config:"max_concurrent_connections"`
+        // API Server settings
+        APIPort                  int    `config:"api_port"`
+        APIHost                  string `config:"api_host"`
+        APITimeout               int    `config:"api_timeout"`
+        MaxRequestSize           int64  `config:"max_request_size"`
+        MaxConcurrentConnections int    `config:"max_concurrent_connections"`
+        ReactorBaseURL           string `config:"reactor_base_url"`
 
 	// WebSocket settings
 	WebSocketEnabled      bool `config:"websocket_enabled"`
@@ -86,26 +88,27 @@ type Config struct {
 
 // We provide default configuration values with port 8238
 func defaultConfig() *Config {
-	return &Config{
-		APIPort:                  8238,
-		APIHost:                  "0.0.0.0",
-		APITimeout:               30,
-		MaxRequestSize:           10485760,
-		MaxConcurrentConnections: 1000,
-		WebSocketEnabled:         true,
-		WebSocketBufferSize:      4096,
-		WebSocketTimeout:         300,
-		WebSocketPingInterval:    30,
-		ParentMass:               235.0,
-		ExcitationEnergy:         6.5,
-		EventsPerSecond:          5.0,
-		MaxEnergyField:           1000.0,
-		LogLevel:                 "info",
-		VerboseOutput:            false,
-		PrometheusEnabled:        true,
-		CORSEnabled:              true,
-		RateLimitingEnabled:      true,
-	}
+        return &Config{
+                APIPort:                  8238,
+                APIHost:                  "0.0.0.0",
+                APITimeout:               30,
+                MaxRequestSize:           10485760,
+                MaxConcurrentConnections: 1000,
+                ReactorBaseURL:           "http://localhost:8333",
+                WebSocketEnabled:         true,
+                WebSocketBufferSize:      4096,
+                WebSocketTimeout:         300,
+                WebSocketPingInterval:    30,
+                ParentMass:               235.0,
+                ExcitationEnergy:         6.5,
+                EventsPerSecond:          5.0,
+                MaxEnergyField:           1000.0,
+                LogLevel:                 "info",
+                VerboseOutput:            false,
+                PrometheusEnabled:        true,
+                CORSEnabled:              true,
+                RateLimitingEnabled:      true,
+        }
 }
 
 // We parse configuration file with proper inline comment handling and whitespace trimming
@@ -150,17 +153,19 @@ func parseConfigFile(filename string) (*Config, error) {
 		}
 
 		// We set configuration values based on key
-		switch key {
-		case "api_port":
-			if port, err := strconv.Atoi(value); err == nil {
-				config.APIPort = port
-			}
-		case "api_host":
-			config.APIHost = value
-		case "events_per_second":
-			if eps, err := strconv.ParseFloat(value, 64); err == nil {
-				config.EventsPerSecond = eps
-			}
+                switch key {
+                case "api_port":
+                        if port, err := strconv.Atoi(value); err == nil {
+                                config.APIPort = port
+                        }
+                case "api_host":
+                        config.APIHost = value
+                case "reactor_base_url":
+                        config.ReactorBaseURL = value
+                case "events_per_second":
+                        if eps, err := strconv.ParseFloat(value, 64); err == nil {
+                                config.EventsPerSecond = eps
+                        }
 		case "parent_mass":
 			if mass, err := strconv.ParseFloat(value, 64); err == nil {
 				config.ParentMass = mass
@@ -240,46 +245,43 @@ type SystemStatusResponse struct {
 
 // We implement the main API server structure
 type TernaryFissionAPIServer struct {
-	config            *Config
-	server            *http.Server
-	router            *mux.Router
-	websocketUpgrader websocket.Upgrader
-	activeConnections map[string]*websocket.Conn
-	connectionsMutex  sync.RWMutex
-	startTime         time.Time
+        config            *Config
+        server            *http.Server
+        router            *mux.Router
+        websocketUpgrader websocket.Upgrader
+        activeConnections map[string]*websocket.Conn
+        connectionsMutex  sync.RWMutex
+        startTime         time.Time
 
-	// Performance metrics
-	requestCounter    *prometheus.CounterVec
-	responseTime      *prometheus.HistogramVec
-	activeFieldsGauge prometheus.Gauge
-	energyTotalGauge  prometheus.Gauge
+        // Performance metrics
+        requestCounter    *prometheus.CounterVec
+        responseTime      *prometheus.HistogramVec
+        activeFieldsGauge prometheus.Gauge
+        energyTotalGauge  prometheus.Gauge
 
-	// Application state
-	energyFields   map[string]*EnergyFieldResponse
-	fieldsMutex    sync.RWMutex
-	fieldIDCounter int64
+        // Reactor communication
+        reactorClient *http.Client
 
-	// System control
-	simulationRunning atomic.Bool
-	shutdownChan      chan os.Signal
-	ctx               context.Context
-	cancelFunc        context.CancelFunc
+        // System control
+        shutdownChan chan os.Signal
+        ctx          context.Context
+        cancelFunc   context.CancelFunc
 }
 
 // We initialize the API server with configuration
 func NewTernaryFissionAPIServer(config *Config) *TernaryFissionAPIServer {
-	ctx, cancel := context.WithCancel(context.Background())
+        ctx, cancel := context.WithCancel(context.Background())
 
-	server := &TernaryFissionAPIServer{
-		config:            config,
-		router:            mux.NewRouter(),
-		activeConnections: make(map[string]*websocket.Conn),
-		energyFields:      make(map[string]*EnergyFieldResponse),
-		shutdownChan:      make(chan os.Signal, 1),
-		ctx:               ctx,
-		cancelFunc:        cancel,
-		startTime:         time.Now(),
-	}
+        server := &TernaryFissionAPIServer{
+                config:            config,
+                router:            mux.NewRouter(),
+                activeConnections: make(map[string]*websocket.Conn),
+                reactorClient:     &http.Client{Timeout: time.Duration(config.APITimeout) * time.Second},
+                shutdownChan:      make(chan os.Signal, 1),
+                ctx:               ctx,
+                cancelFunc:        cancel,
+                startTime:         time.Now(),
+        }
 
 	// We configure WebSocket upgrader with proper settings
 	server.websocketUpgrader = websocket.Upgrader{
@@ -1372,241 +1374,165 @@ func (s *TernaryFissionAPIServer) serveDashboard(w http.ResponseWriter, r *http.
 
 // We implement the energy field creation endpoint
 func (s *TernaryFissionAPIServer) createEnergyField(w http.ResponseWriter, r *http.Request) {
-	var request EnergyFieldRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid JSON request")
-		return
-	}
+        body, err := io.ReadAll(r.Body)
+        if err != nil {
+                s.writeErrorResponse(w, http.StatusBadRequest, "Invalid request body")
+                return
+        }
 
-	// We validate input parameters
-	if request.InitialEnergyMeV <= 0 || request.InitialEnergyMeV > s.config.MaxEnergyField {
-		s.writeErrorResponse(w, http.StatusBadRequest,
-			fmt.Sprintf("Energy must be between 0.1 and %.1f MeV", s.config.MaxEnergyField))
-		return
-	}
+        req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/v1/energy-fields", s.config.ReactorBaseURL), bytes.NewReader(body))
+        if err != nil {
+                s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to build reactor request")
+                return
+        }
+        req.Header.Set("Content-Type", "application/json")
 
-	// We generate unique field ID
-	fieldID := fmt.Sprintf("field_%d_%d", atomic.AddInt64(&s.fieldIDCounter, 1), time.Now().Unix())
+        resp, err := s.reactorClient.Do(req)
+        if err != nil {
+                s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+                return
+        }
+        defer resp.Body.Close()
 
-	// We create energy field response structure
-	field := &EnergyFieldResponse{
-		FieldID:             fieldID,
-		EnergyMeV:           request.InitialEnergyMeV,
-		MemoryBytes:         uint64(request.InitialEnergyMeV * 1e6), // 1 MeV = 1MB simulation
-		CPUCycles:           uint64(request.InitialEnergyMeV * 1e9), // 1 MeV = 1B cycles simulation
-		EntropyFactor:       1.0,
-		DissipationRate:     0.0,
-		StabilityFactor:     1.0,
-		InteractionStrength: request.InitialEnergyMeV / 1000.0,
-		Active:              true,
-		TotalEnergyMeV:      request.InitialEnergyMeV,
-		CreatedAt:           time.Now(),
-		LastUpdated:         time.Now(),
-		Status:              "active",
-	}
-
-	// We store the field in our tracking system
-	s.fieldsMutex.Lock()
-	s.energyFields[fieldID] = field
-	s.fieldsMutex.Unlock()
-
-	// We update metrics
-	if s.config.PrometheusEnabled {
-		s.activeFieldsGauge.Inc()
-		s.energyTotalGauge.Add(request.InitialEnergyMeV)
-	}
-
-	// We start auto-dissipation if requested
-	if request.AutoDissipate {
-		go s.autoDissipateField(fieldID, request.DissipationRounds)
-	}
-
-	log.Printf("Created energy field %s with %.2f MeV", fieldID, request.InitialEnergyMeV)
-	s.writeJSONResponse(w, http.StatusCreated, field)
+        w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+        w.WriteHeader(resp.StatusCode)
+        io.Copy(w, resp.Body)
 }
 
 // We implement the system status endpoint
 func (s *TernaryFissionAPIServer) getSystemStatus(w http.ResponseWriter, r *http.Request) {
-	s.fieldsMutex.RLock()
-	activeFields := len(s.energyFields)
-	totalEnergy := 0.0
-	for _, field := range s.energyFields {
-		totalEnergy += field.EnergyMeV
-	}
-	s.fieldsMutex.RUnlock()
+        resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/status", s.config.ReactorBaseURL))
+        if err != nil {
+                s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+                return
+        }
+        defer resp.Body.Close()
 
-	uptime := time.Since(s.startTime)
+        if resp.StatusCode != http.StatusOK {
+                body, _ := io.ReadAll(resp.Body)
+                s.writeErrorResponse(w, resp.StatusCode, string(body))
+                return
+        }
 
-	status := SystemStatusResponse{
-		UptimeSeconds:        int64(uptime.Seconds()),
-		TotalFissionEvents:   uint64(activeFields * 100), // Simulated based on fields
-		TotalEnergySimulated: totalEnergy,
-		ActiveEnergyFields:   activeFields,
-		PeakMemoryUsage:      uint64(totalEnergy * 1e6),          // Based on energy mapping
-		AverageCalcTime:      125.5 + float64(activeFields)*10.0, // Scales with load
-		TotalCalculations:    uint64(activeFields * 250),         // Simulated
-		SimulationRunning:    s.simulationRunning.Load(),
-		CPUUsagePercent:      25.0 + float64(activeFields)*5.0, // Simulated load
-		MemoryUsagePercent:   15.0 + float64(activeFields)*3.0, // Simulated usage
-	}
+        var status SystemStatusResponse
+        if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+                s.writeErrorResponse(w, http.StatusInternalServerError, "Invalid reactor response")
+                return
+        }
 
-	s.writeJSONResponse(w, http.StatusOK, status)
+        if s.config.PrometheusEnabled {
+                s.activeFieldsGauge.Set(float64(status.ActiveEnergyFields))
+                s.energyTotalGauge.Set(status.TotalEnergySimulated)
+        }
+
+        s.writeJSONResponse(w, http.StatusOK, status)
 }
 
 // We list all energy fields
 func (s *TernaryFissionAPIServer) listEnergyFields(w http.ResponseWriter, r *http.Request) {
-	s.fieldsMutex.RLock()
-	fields := make([]*EnergyFieldResponse, 0, len(s.energyFields))
-	for _, field := range s.energyFields {
-		fields = append(fields, field)
-	}
-	s.fieldsMutex.RUnlock()
+        resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/energy-fields", s.config.ReactorBaseURL))
+        if err != nil {
+                s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+                return
+        }
+        defer resp.Body.Close()
 
-	response := map[string]interface{}{
-		"fields": fields,
-		"count":  len(fields),
-		"total_energy": func() float64 {
-			total := 0.0
-			for _, field := range fields {
-				total += field.EnergyMeV
-			}
-			return total
-		}(),
-	}
-
-	s.writeJSONResponse(w, http.StatusOK, response)
+        w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+        w.WriteHeader(resp.StatusCode)
+        io.Copy(w, resp.Body)
 }
 
 // We get a specific energy field
 func (s *TernaryFissionAPIServer) getEnergyField(w http.ResponseWriter, r *http.Request) {
-	// We extract field ID from URL path
-	pathParts := strings.Split(r.URL.Path, "/")
-	if len(pathParts) < 4 {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid field ID")
-		return
-	}
-	fieldID := pathParts[len(pathParts)-1]
+        pathParts := strings.Split(r.URL.Path, "/")
+        if len(pathParts) < 4 {
+                s.writeErrorResponse(w, http.StatusBadRequest, "Invalid field ID")
+                return
+        }
+        fieldID := pathParts[len(pathParts)-1]
 
-	s.fieldsMutex.RLock()
-	field, exists := s.energyFields[fieldID]
-	s.fieldsMutex.RUnlock()
+        resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/energy-fields/%s", s.config.ReactorBaseURL, fieldID))
+        if err != nil {
+                s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+                return
+        }
+        defer resp.Body.Close()
 
-	if !exists {
-		s.writeErrorResponse(w, http.StatusNotFound, "Energy field not found")
-		return
-	}
-
-	s.writeJSONResponse(w, http.StatusOK, field)
+        w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+        w.WriteHeader(resp.StatusCode)
+        io.Copy(w, resp.Body)
 }
 
 // We delete an energy field
 func (s *TernaryFissionAPIServer) deleteEnergyField(w http.ResponseWriter, r *http.Request) {
-	// We extract field ID from URL path
-	pathParts := strings.Split(r.URL.Path, "/")
-	if len(pathParts) < 4 {
-		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid field ID")
-		return
-	}
-	fieldID := pathParts[len(pathParts)-1]
+        pathParts := strings.Split(r.URL.Path, "/")
+        if len(pathParts) < 4 {
+                s.writeErrorResponse(w, http.StatusBadRequest, "Invalid field ID")
+                return
+        }
+        fieldID := pathParts[len(pathParts)-1]
 
-	s.fieldsMutex.Lock()
-	field, exists := s.energyFields[fieldID]
-	if exists {
-		delete(s.energyFields, fieldID)
-		if s.config.PrometheusEnabled {
-			s.activeFieldsGauge.Dec()
-			s.energyTotalGauge.Sub(field.EnergyMeV)
-		}
-	}
-	s.fieldsMutex.Unlock()
+        req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/api/v1/energy-fields/%s", s.config.ReactorBaseURL, fieldID), nil)
+        if err != nil {
+                s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to build reactor request")
+                return
+        }
 
-	if !exists {
-		s.writeErrorResponse(w, http.StatusNotFound, "Energy field not found")
-		return
-	}
+        resp, err := s.reactorClient.Do(req)
+        if err != nil {
+                s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+                return
+        }
+        defer resp.Body.Close()
 
-	log.Printf("Deleted energy field %s", fieldID)
-	s.writeJSONResponse(w, http.StatusOK, map[string]string{
-		"message":  "Energy field deleted successfully",
-		"field_id": fieldID,
-	})
+        w.Header().Set("Content-Type", resp.Header.Get("Content-Type"))
+        w.WriteHeader(resp.StatusCode)
+        io.Copy(w, resp.Body)
 }
 
 // We handle WebSocket connections for real-time monitoring
 func (s *TernaryFissionAPIServer) handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
-	conn, err := s.websocketUpgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Printf("WebSocket upgrade failed: %v", err)
-		return
-	}
-	defer conn.Close()
+        conn, err := s.websocketUpgrader.Upgrade(w, r, nil)
+        if err != nil {
+                log.Printf("WebSocket upgrade failed: %v", err)
+                return
+        }
+        defer conn.Close()
 
-	log.Printf("WebSocket client connected: %s", r.RemoteAddr)
+        log.Printf("WebSocket client connected: %s", r.RemoteAddr)
 
-	// We send periodic status updates via WebSocket
-	ticker := time.NewTicker(time.Duration(s.config.WebSocketPingInterval) * time.Second)
-	defer ticker.Stop()
+        ticker := time.NewTicker(time.Duration(s.config.WebSocketPingInterval) * time.Second)
+        defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			s.fieldsMutex.RLock()
-			activeFields := len(s.energyFields)
-			totalEnergy := 0.0
-			fieldsList := make([]string, 0, len(s.energyFields))
-			for id, field := range s.energyFields {
-				totalEnergy += field.EnergyMeV
-				fieldsList = append(fieldsList, id)
-			}
-			s.fieldsMutex.RUnlock()
+        for {
+                select {
+                case <-ticker.C:
+                        resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/status", s.config.ReactorBaseURL))
+                        if err != nil {
+                                log.Printf("WebSocket status fetch failed: %v", err)
+                                return
+                        }
+                        var status SystemStatusResponse
+                        if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+                                resp.Body.Close()
+                                log.Printf("WebSocket status decode failed: %v", err)
+                                return
+                        }
+                        resp.Body.Close()
 
-			update := map[string]interface{}{
-				"timestamp":          time.Now(),
-				"active_fields":      activeFields,
-				"total_energy":       totalEnergy,
-				"simulation_running": s.simulationRunning.Load(),
-				"uptime_seconds":     int64(time.Since(s.startTime).Seconds()),
-				"field_ids":          fieldsList,
-			}
-
-			if err := conn.WriteJSON(update); err != nil {
-				log.Printf("WebSocket write failed: %v", err)
-				return
-			}
-		}
-	}
+                        if err := conn.WriteJSON(status); err != nil {
+                                log.Printf("WebSocket write failed: %v", err)
+                                return
+                        }
+                case <-s.ctx.Done():
+                        return
+                }
+        }
 }
 
 // Placeholder methods with enhanced functionality
 func (s *TernaryFissionAPIServer) dissipateEnergyField(w http.ResponseWriter, r *http.Request) {
-	s.writeErrorResponse(w, http.StatusNotImplemented, "Energy field dissipation feature coming soon - will integrate with C++ physics engine")
-}
-
-func (s *TernaryFissionAPIServer) autoDissipateField(fieldID string, rounds int) {
-	log.Printf("Starting auto-dissipation for field %s with %d rounds", fieldID, rounds)
-
-	for i := 0; i < rounds; i++ {
-		time.Sleep(2 * time.Second)
-
-		s.fieldsMutex.Lock()
-		if field, exists := s.energyFields[fieldID]; exists {
-			field.EnergyMeV *= 0.95 // 5% energy loss per round
-			field.LastUpdated = time.Now()
-
-			if field.EnergyMeV < 0.01 {
-				field.Status = "dissipated"
-				log.Printf("Energy field %s fully dissipated after %d rounds", fieldID, i+1)
-				s.fieldsMutex.Unlock()
-				return
-			}
-		} else {
-			s.fieldsMutex.Unlock()
-			return
-		}
-		s.fieldsMutex.Unlock()
-	}
-
-	log.Printf("Auto-dissipation completed for field %s", fieldID)
+        s.writeErrorResponse(w, http.StatusNotImplemented, "Energy field dissipation feature coming soon - will integrate with C++ physics engine")
 }
 
 // =============================================================================
@@ -1669,23 +1595,29 @@ func (s *TernaryFissionAPIServer) corsMiddleware(next http.Handler) http.Handler
 }
 
 func (s *TernaryFissionAPIServer) healthCheck(w http.ResponseWriter, r *http.Request) {
-	uptime := time.Since(s.startTime)
+        uptime := time.Since(s.startTime)
 
-	s.fieldsMutex.RLock()
-	activeFields := len(s.energyFields)
-	s.fieldsMutex.RUnlock()
+        resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/status", s.config.ReactorBaseURL))
+        if err != nil {
+                s.writeErrorResponse(w, http.StatusBadGateway, "Failed to contact reactor")
+                return
+        }
+        var status SystemStatusResponse
+        if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
+                resp.Body.Close()
+                s.writeErrorResponse(w, http.StatusInternalServerError, "Invalid reactor response")
+                return
+        }
+        resp.Body.Close()
 
-	health := map[string]interface{}{
-		"status":               "healthy",
-		"timestamp":            time.Now().Format(time.RFC3339),
-		"uptime_seconds":       int64(uptime.Seconds()),
-		"active_energy_fields": activeFields,
-		"simulation_running":   s.simulationRunning.Load(),
-		"version":              "1.1.13",
-		"author":               "bthlops (David StJ)",
-	}
+        health := map[string]interface{}{
+                "status":               "healthy",
+                "timestamp":            time.Now().Format(time.RFC3339),
+                "uptime_seconds":       int64(uptime.Seconds()),
+                "active_energy_fields": status.ActiveEnergyFields,
+        }
 
-	s.writeJSONResponse(w, http.StatusOK, health)
+        s.writeJSONResponse(w, http.StatusOK, health)
 }
 
 // We start the API server
