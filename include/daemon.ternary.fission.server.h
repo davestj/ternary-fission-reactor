@@ -234,6 +234,12 @@ public:
      * This method performs graceful restart without service interruption
      */
     bool restartDaemon();
+
+    /**
+     * We run the main daemon loop executing health checks
+     * This method repeats configuration tests until shutdown is requested
+     */
+    void runMainLoop();
     
     /**
      * We check if the daemon is currently running
