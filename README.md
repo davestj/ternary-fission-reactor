@@ -15,6 +15,8 @@
 
 High-performance ternary nuclear fission simulation with C++ physics engine, Go REST API, and Docker deployment. Maps nuclear energy to computational resources with real-time monitoring and conservation law verification using multi-base mathematical frameworks.
 
+A speculative [Wormhole Physics](docs/PHYSICS.md#wormhole-physics) section surveys Einstein–Rosen bridges, Lorentzian wormholes, and quantum computing feasibility.
+
 
 ## Overview
 
@@ -25,7 +27,7 @@ The system emulates ternary nuclear fission to explore how computational resourc
 - Distributed daemon architecture bridging C++ and Go components
 - Docker-first deployment with real-time monitoring stack
 - Kubernetes-ready configuration and release workflows
-- See [ARCH.md](ARCH.md), [HOW-TO.md](HOW-TO.md), and [NEXT-STEPS.md](NEXT-STEPS.md) for RC milestone details
+- See [ARCH.md](ARCH.md), [HOW-TO.md](HOW-TO.md), [docs/BENCHMARKING.md](docs/BENCHMARKING.md), and [NEXT-STEPS.md](NEXT-STEPS.md) for RC milestone details
 
 ## Architecture
 
@@ -46,6 +48,10 @@ make go-build        # build Go components
 make cpp-test        # run C++ unit tests
 make static-analysis # run static analysis
 ```
+
+## Library Integration
+
+See [docs/INTEGRATION.md](docs/INTEGRATION.md) for guidance on linking the reactor libraries into external C++ applications and integrating with external monitoring systems.
 
 ## Configuration Examples
 
@@ -70,6 +76,16 @@ See [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md) for default values, valid options
 # Access web dashboard
 open http://localhost:8080
 ```
+
+## Clustering & Load Balancing
+
+The daemon layer scales horizontally using an eight-node ring topology. Nodes are numbered `node0` through `node7`, each maintaining a persistent connection to its immediate neighbors. Workloads are sharded with `shard = hash(task_id) % 8` and routed to the node owning that shard.
+
+- Each node owns one primary shard and serves as standby for its predecessor's shard
+- Neighbor heartbeats detect failures and trigger automatic shard reassignment
+- Recovery reintegrates the node and rebalances shards across the ring
+
+This strategy provides even load distribution while ensuring any single node failure is absorbed by the remaining ring without service interruption.
 
 ## 📊 Current Development Status (v1.1.15-alpha)
 
@@ -124,6 +140,8 @@ Open `http://localhost:8333/login.html` to authenticate and reach the dashboard.
 ## Related Documentation
 
 - [HOW-TO.md](HOW-TO.md) - Complete usage guide with examples from basic to extreme simulations
+- [docs/MATH_PRIMER.md](docs/MATH_PRIMER.md) - Base-3/5/8/17 arithmetic for energy distribution
+- [docs/BENCHMARKING.md](docs/BENCHMARKING.md) - Benchmark presets for repeatable runs
 - [TESTING.md](TESTING.md) - Docker testing procedures and verification commands
 - [NEXT-STEPS.md](NEXT-STEPS.md) - Development roadmap and technical debt analysis
 - [BUILD_CARRYOVER.md](BUILD_CARRYOVER.md) - Development context and architecture overview
@@ -444,6 +462,7 @@ make test-integration
 
 ### Technical Documentation
 - **[HOW-TO.md](HOW-TO.md)** - Complete usage guide from basic to extreme simulations
+- **[docs/BENCHMARKING.md](docs/BENCHMARKING.md)** - Benchmark presets for repeatable runs
 - **[TESTING.md](TESTING.md)** - Docker testing procedures and API verification
 - **[NEXT-STEPS.md](NEXT-STEPS.md)** - Development roadmap and architecture improvements
 - **[BUILD_CARRYOVER.md](BUILD_CARRYOVER.md)** - Development context and system overview
