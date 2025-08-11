@@ -206,6 +206,7 @@ private:
     void handlePortalTrigger(const httplib::Request& req, httplib::Response& res); // Trigger portal load
     void handleStreamStart(const httplib::Request& req, httplib::Response& res); // Start media streaming
     void handleStreamStop(const httplib::Request& req, httplib::Response& res);  // Stop media streaming
+    void handleStreamProxy(const httplib::Request& req, httplib::Response& res); // Proxy media stream
     void handleFissionCalculation(const httplib::Request& req, httplib::Response& res); // Fission calc
     void handleConservationLaws(const httplib::Request& req, httplib::Response& res); // Conservation check
     void handleEnergyGeneration(const httplib::Request& req, httplib::Response& res); // Energy generation

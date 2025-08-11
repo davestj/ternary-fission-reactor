@@ -23,3 +23,21 @@ Attach USB SDR dongles to each node and capture spectrum data while simultaneous
 ## Notable Investigations and Data Gathering
 
 Field studies may draw inspiration from research at Skinwalker Ranch and experiments with harmonic triangles. Log time-stamped sensor readings, audio recordings, and SDR captures. Store data centrally for comparison across nodes, and note any anomalous correlations between geometry, load profiles, and environmental responses.
+
+## Media Preparation and Streaming
+
+Use the optional streaming subsystem to broadcast test tones or field recordings during deployments:
+
+```bash
+sudo mkdir -p /var/lib/media
+cp tone.ogg /var/lib/media/
+echo "tone.ogg" > /var/lib/media/playlist.m3u
+curl -X POST http://localhost:8333/api/v1/stream/start
+curl http://localhost:8333/stream --output field-test.ogg
+```
+
+Individual files can also be accessed directly:
+
+```bash
+curl http://localhost:8333/media/tone.ogg --output tone.ogg
+```

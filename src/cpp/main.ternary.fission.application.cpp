@@ -197,6 +197,14 @@ int main(int argc, char *argv[]) {
     ::setenv("TERNARY_DAEMON_MODE", "1", 1);
   }
 
+  if (!daemon_mode) {
+    ConfigurationManager cfg_check(config_path);
+    if (cfg_check.getDaemonConfig().daemon_mode) {
+      daemon_mode = true;
+      ::setenv("TERNARY_DAEMON_MODE", "1", 1);
+    }
+  }
+
   if (daemon_mode) {
     runDaemonMode(config_path, bind_ip, bind_port);
     return 0;
@@ -380,7 +388,7 @@ void runDaemonMode(const std::string &config_file, const std::string &bind_ip,
     std::cerr << "Failed to start daemon" << std::endl;
     return;
   }
-  daemon.waitForShutdown(std::chrono::seconds::max());
+  daemon.runMainLoop();
 }
 
 void runHTTPServerMode(const std::string &config_file,
