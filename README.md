@@ -9,7 +9,7 @@
 ![v2.0.0-rc1](https://img.shields.io/badge/Version-2.0.0--rc1-orange)
 
 **Author:** bthlops (David StJ)  
-**Version:** 1.1.15-alpha (Latest: [Releases](https://github.com/davestj/ternary-fission-reactor/releases))  
+**Version:** v2.0.0-rc1 (Latest: [Releases](https://github.com/davestj/ternary-fission-reactor/releases))
 **Last Updated:** July 31, 2025  
 **Repository:** https://github.com/davestj/ternary-fission-reactor
 
@@ -23,11 +23,19 @@ A speculative [Wormhole Physics](docs/PHYSICS.md#wormhole-physics) section surve
 The system emulates ternary nuclear fission to explore how computational resources map to energy production. It pairs a high-speed C++ physics core with a Go-based API and web dashboard for monitoring and interaction.
 
 ## Version 2.0.0-rc1 Highlights
+The 2.0.0 release candidate targets cross-platform build stability, API and dashboard validation, and deployment pipeline optimization. See [CHANGELOG.md](CHANGELOG.md) and [RELEASE.md](RELEASE.md) for full details on objectives and progress.
 
 - Distributed daemon architecture bridging C++ and Go components
 - Docker-first deployment with real-time monitoring stack
 - Kubernetes-ready configuration and release workflows
 - See [ARCH.md](ARCH.md), [HOW-TO.md](HOW-TO.md), [docs/BENCHMARKING.md](docs/BENCHMARKING.md), and [NEXT-STEPS.md](NEXT-STEPS.md) for RC milestone details
+
+## Recent Enhancements
+
+- **Portal trigger simulation API**: Introduced endpoints and dashboard controls for initiating portal operations ([PR #105](https://github.com/davestj/ternary-fission-reactor/pull/105)).
+- **Power monitoring dashboard**: Added Chart.js visuals and estimated power tracking for real-time insight ([PR #107](https://github.com/davestj/ternary-fission-reactor/pull/107), [PR #106](https://github.com/davestj/ternary-fission-reactor/pull/106)).
+- **Debian package support**: Added DEB packaging steps to streamline distribution ([PR #114](https://github.com/davestj/ternary-fission-reactor/pull/114)).
+- **Release version automation**: Build workflow now computes release version from development runs ([PR #113](https://github.com/davestj/ternary-fission-reactor/pull/113)).
 
 ## Architecture
 
@@ -87,7 +95,7 @@ The daemon layer scales horizontally using an eight-node ring topology. Nodes ar
 
 This strategy provides even load distribution while ensuring any single node failure is absorbed by the remaining ring without service interruption.
 
-## 📊 Current Development Status (v1.1.15-alpha)
+## 📊 Current Development Status (v2.0.0-rc1)
 
 ### ✅ Fully Working Components
 - **C++ Physics Engine**: Fully functional ternary fission simulation with conservation law verification
@@ -135,7 +143,10 @@ Open `http://localhost:8333/login.html` to authenticate and reach the dashboard.
 ### 🎯 Updated Release Timeline
 - **v1.1.25**: Complete API testing → **v1.2.1-beta** (Full feature completion)
 - **v1.2.100**: Performance optimization → **v1.3.1** Gold Release
-- **Current Focus**: Comprehensive API testing and Kubernetes integration
+- **future branch** initiated for next-generation work
+- **Major features**: reactor integration, dashboard, CLI restoration
+- **2.0.0-rc1**: transition to release candidate
+- **Upcoming Goals**: RC validation and production release
 
 ## Related Documentation
 
