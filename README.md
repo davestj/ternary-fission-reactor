@@ -49,6 +49,10 @@ make cpp-test        # run C++ unit tests
 make static-analysis # run static analysis
 ```
 
+## Library Integration
+
+See [docs/INTEGRATION.md](docs/INTEGRATION.md) for guidance on linking the reactor libraries into external C++ applications and integrating with external monitoring systems.
+
 ## Configuration Examples
 
 ```ini
