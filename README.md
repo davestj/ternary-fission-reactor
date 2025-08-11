@@ -57,6 +57,14 @@ make cpp-test        # run C++ unit tests
 make static-analysis # run static analysis
 ```
 
+## Install
+
+```bash
+sudo make install
+```
+
+Installs the binaries to `/usr/bin`, copies default configuration files into `/etc/bthl/`, populates web assets under `/var/www/bthl/ternary-fission-web/`, and ensures `/var/lib/media/` exists for streaming content. macOS uses `install -m 755` while Debian systems leverage `install -D`.
+
 ## Library Integration
 
 See [docs/INTEGRATION.md](docs/INTEGRATION.md) for guidance on linking the reactor libraries into external C++ applications and integrating with external monitoring systems.
