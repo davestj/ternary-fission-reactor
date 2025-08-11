@@ -123,6 +123,23 @@ curl http://localhost:8333/index.html      # Fetch static test page
 curl http://localhost:8333/stream          # Stream media content
 ```
 
+#### Preparing Media Files
+```bash
+sudo mkdir -p /var/lib/media
+cp track.ogg /var/lib/media/
+echo "track.ogg" > /var/lib/media/playlist.m3u
+```
+
+`media_root` defaults to `/var/lib/media`; override with `TERNARY_MEDIA_ROOT` if needed.
+
+Enable streaming in the configuration or via `TERNARY_MEDIA_STREAMING_ENABLED=true` and start `ices2` through the API:
+
+```bash
+curl -X POST http://localhost:8333/api/v1/stream/start
+curl http://localhost:8333/stream --output sample.ogg   # Verify proxy to ices2
+curl http://localhost:8333/media/track.ogg --output track.ogg  # Serve file directly
+```
+
 ### Web Dashboard Structure
 - **Atoms** (`web/atoms`): buttons, inputs, and shared styles
 - **Molecules** (`web/molecules`): login form and status cards

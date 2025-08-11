@@ -148,9 +148,9 @@ struct LoggingConfiguration {
  * locations
  */
 struct MediaStreamingConfiguration {
-  bool media_streaming_enabled = false; // Enable media streaming subsystem
-  std::string media_root;               // Root directory for media files
-  std::string icecast_mount;            // Target Icecast mount point
+    bool media_streaming_enabled = false; // Enable media streaming subsystem
+    std::string media_root = "/var/lib/media"; // Root directory for media files
+    std::string icecast_mount;            // Target Icecast mount point
 };
 
 /**

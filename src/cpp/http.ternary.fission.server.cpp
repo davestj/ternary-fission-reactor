@@ -345,6 +345,9 @@ bool HTTPTernaryFissionServer::initialize() {
 
   if (server) {
     server->set_mount_point("/", network_config.web_root);
+    if (media_streaming_manager_) {
+        server->set_mount_point("/media", media_config.media_root);
+    }
     server->set_file_extension_and_mimetype_mapping("html", "text/html");
     server->set_file_extension_and_mimetype_mapping("css", "text/css");
     server->set_file_extension_and_mimetype_mapping("js",
@@ -691,6 +694,14 @@ void HTTPTernaryFissionServer::setupAPIEndpoints() {
               [this](const httplib::Request &req, httplib::Response &res) {
                 this->handlePortalTrigger(req, res);
               });
+
+    if (media_streaming_manager_) {
+        auto media_cfg = config_manager_->getMediaStreamingConfig();
+        server->Get(media_cfg.icecast_mount.c_str(),
+                    [this](const httplib::Request &req, httplib::Response &res) {
+                        this->handleStreamProxy(req, res);
+                    });
+    }
 
   // We setup media streaming control endpoints
   server->Post("/api/v1/stream/start",
@@ -1473,6 +1484,31 @@ void HTTPTernaryFissionServer::handleStreamStop(
     sendErrorResponse(res, 500, "Failed to stop media streaming");
     metrics_->incrementErrors();
   }
+}
+
+void HTTPTernaryFissionServer::handleStreamProxy(
+    const httplib::Request & /*req*/, httplib::Response &res) {
+    if (!media_streaming_manager_) {
+        sendErrorResponse(res, 400, "Media streaming not enabled");
+        metrics_->incrementErrors();
+        return;
+    }
+
+    auto media_cfg = config_manager_->getMediaStreamingConfig();
+    httplib::Client client("localhost", 8000);
+    if (auto r = client.Get(media_cfg.icecast_mount.c_str())) {
+        res.status = r->status;
+        auto content_type = r->get_header_value("Content-Type");
+        if (!content_type.empty()) {
+            res.set_content(r->body, content_type.c_str());
+        } else {
+            res.set_content(r->body, "application/octet-stream");
+        }
+        metrics_->incrementSuccessful();
+    } else {
+        sendErrorResponse(res, 503, "Media stream unavailable");
+        metrics_->incrementErrors();
+    }
 }
 
 void HTTPTernaryFissionServer::handleFissionCalculation(
