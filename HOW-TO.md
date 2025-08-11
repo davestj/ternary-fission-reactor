@@ -6,6 +6,8 @@
 **Purpose:** Comprehensive examples from basic to extreme simulation scenarios including verified Docker workflows
 **Reason:** Updated guide reflecting current working status with Docker Compose operational and Go API server confirmed functional
 
+See [docs/MATH_PRIMER.md](docs/MATH_PRIMER.md) for the multi-base arithmetic driving energy distribution.
+
 **Change Log:**
 - 2025-07-31: Updated with working Docker Compose deployment and verified API endpoints
 - 2025-07-31: Added Docker testing procedures and container-based workflows

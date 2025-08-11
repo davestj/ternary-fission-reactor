@@ -134,6 +134,7 @@ Open `http://localhost:8333/login.html` to authenticate and reach the dashboard.
 ## Related Documentation
 
 - [HOW-TO.md](HOW-TO.md) - Complete usage guide with examples from basic to extreme simulations
+- [docs/MATH_PRIMER.md](docs/MATH_PRIMER.md) - Base-3/5/8/17 arithmetic for energy distribution
 - [docs/BENCHMARKING.md](docs/BENCHMARKING.md) - Benchmark presets for repeatable runs
 - [TESTING.md](TESTING.md) - Docker testing procedures and verification commands
 - [NEXT-STEPS.md](NEXT-STEPS.md) - Development roadmap and technical debt analysis
