@@ -143,7 +143,10 @@ Open `http://localhost:8333/login.html` to authenticate and reach the dashboard.
 ### 🎯 Updated Release Timeline
 - **v1.1.25**: Complete API testing → **v1.2.1-beta** (Full feature completion)
 - **v1.2.100**: Performance optimization → **v1.3.1** Gold Release
-- **Current Focus**: Comprehensive API testing and Kubernetes integration
+- **future branch** initiated for next-generation work
+- **Major features**: reactor integration, dashboard, CLI restoration
+- **2.0.0-rc1**: transition to release candidate
+- **Upcoming Goals**: RC validation and production release
 
 ## Related Documentation
 
