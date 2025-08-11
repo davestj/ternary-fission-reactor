@@ -7,6 +7,7 @@
 **Reason:** Updated guide reflecting current working status with Docker Compose operational and Go API server confirmed functional
 
 See [docs/MATH_PRIMER.md](docs/MATH_PRIMER.md) for the multi-base arithmetic driving energy distribution.
+See [docs/FIELD_STUDIES.md](docs/FIELD_STUDIES.md) for Raspberry Pi deployment and environmental field techniques.
 
 **Change Log:**
 - 2025-07-31: Updated with working Docker Compose deployment and verified API endpoints
