@@ -365,11 +365,13 @@ bool ConfigurationManager::parseLoggingConfiguration() {
 }
 
 bool ConfigurationManager::parseMediaStreamingConfiguration() {
-  media_streaming_config_.media_streaming_enabled =
-      getConfigBool("media_streaming_enabled", false);
-  media_streaming_config_.media_root = getConfigValue("media_root", "");
-  media_streaming_config_.icecast_mount = getConfigValue("icecast_mount", "");
-  return true;
+    media_streaming_config_.media_streaming_enabled =
+        getConfigBool("media_streaming_enabled", false);
+    media_streaming_config_.media_root =
+        getConfigValue("media_root", "/var/lib/media");
+    media_streaming_config_.icecast_mount =
+        getConfigValue("icecast_mount", "");
+    return true;
 }
 
 /**
