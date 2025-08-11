@@ -15,6 +15,8 @@
 
 High-performance ternary nuclear fission simulation with C++ physics engine, Go REST API, and Docker deployment. Maps nuclear energy to computational resources with real-time monitoring and conservation law verification using multi-base mathematical frameworks.
 
+A speculative [Wormhole Physics](docs/PHYSICS.md#wormhole-physics) section surveys Einstein–Rosen bridges, Lorentzian wormholes, and quantum computing feasibility.
+
 
 ## Overview
 
