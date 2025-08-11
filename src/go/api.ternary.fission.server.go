@@ -71,6 +71,11 @@ type Config struct {
 	ReactorBaseURL           string `config:"reactor_base_url"`
 	StatusPollInterval       int    `config:"status_poll_interval"`
 
+	// TLS settings
+	SSLEnabled    bool   `config:"ssl_enabled"`
+	SSLCertChain  string `config:"ssl_cert_chain"`
+	SSLPrivateKey string `config:"ssl_private_key"`
+
 	// WebSocket settings
 	WebSocketEnabled      bool `config:"websocket_enabled"`
 	WebSocketBufferSize   int  `config:"websocket_buffer_size"`
@@ -103,6 +108,9 @@ func defaultConfig() *Config {
 		MaxConcurrentConnections: 1000,
 		ReactorBaseURL:           "http://127.0.0.1:8333",
 		StatusPollInterval:       15,
+		SSLEnabled:               true,
+		SSLCertChain:             "/etc/ssl/beyondthehorizonlabs.com/fullchain.pem",
+		SSLPrivateKey:            "/etc/ssl/beyondthehorizonlabs.com/beyondthehorizonlabs.com.key",
 		WebSocketEnabled:         true,
 		WebSocketBufferSize:      4096,
 		WebSocketTimeout:         300,
@@ -175,6 +183,12 @@ func parseConfigFile(filename string) (*Config, error) {
 			if interval, err := strconv.Atoi(value); err == nil {
 				config.StatusPollInterval = interval
 			}
+		case "ssl_enabled":
+			config.SSLEnabled = (strings.ToLower(value) == "true")
+		case "ssl_cert_chain":
+			config.SSLCertChain = value
+		case "ssl_private_key":
+			config.SSLPrivateKey = value
 		case "events_per_second":
 			if eps, err := strconv.ParseFloat(value, 64); err == nil {
 				config.EventsPerSecond = eps
@@ -2117,6 +2131,11 @@ func (s *TernaryFissionAPIServer) Start() error {
 
 		s.cancelFunc()
 	}()
+
+	if s.config.SSLEnabled {
+		log.Printf("🚀 Starting Ternary Fission API Server (TLS) on %s", s.server.Addr)
+		return s.server.ListenAndServeTLS(s.config.SSLCertChain, s.config.SSLPrivateKey)
+	}
 
 	log.Printf("🚀 Starting Ternary Fission API Server on %s", s.server.Addr)
 	return s.server.ListenAndServe()

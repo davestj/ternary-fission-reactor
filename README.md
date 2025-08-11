@@ -57,6 +57,14 @@ make cpp-test        # run C++ unit tests
 make static-analysis # run static analysis
 ```
 
+## Install
+
+```bash
+sudo make install
+```
+
+Installs the binaries to `/usr/bin`, copies default configuration files into `/etc/bthl/`, populates web assets under `/var/www/bthl/ternary-fission-web/`, and ensures `/var/lib/media/` exists for streaming content. macOS uses `install -m 755` while Debian systems leverage `install -D`.
+
 ## Library Integration
 
 See [docs/INTEGRATION.md](docs/INTEGRATION.md) for guidance on linking the reactor libraries into external C++ applications and integrating with external monitoring systems.
@@ -121,6 +129,23 @@ This strategy provides even load distribution while ensuring any single node fai
 ```bash
 curl http://localhost:8333/index.html      # Fetch static test page
 curl http://localhost:8333/stream          # Stream media content
+```
+
+#### Preparing Media Files
+```bash
+sudo mkdir -p /var/lib/media
+cp track.ogg /var/lib/media/
+echo "track.ogg" > /var/lib/media/playlist.m3u
+```
+
+`media_root` defaults to `/var/lib/media`; override with `TERNARY_MEDIA_ROOT` if needed.
+
+Enable streaming in the configuration or via `TERNARY_MEDIA_STREAMING_ENABLED=true` and start `ices2` through the API:
+
+```bash
+curl -X POST http://localhost:8333/api/v1/stream/start
+curl http://localhost:8333/stream --output sample.ogg   # Verify proxy to ices2
+curl http://localhost:8333/media/track.ogg --output track.ogg  # Serve file directly
 ```
 
 ### Web Dashboard Structure

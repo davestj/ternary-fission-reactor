@@ -13,6 +13,7 @@
 # - 2025-08-07: Enhanced test system to support multiple test suites with proper dependency management
 # - 2025-08-07: Added comprehensive test harness with platform-specific test execution
 # - 2025-08-09: Automated C++ object discovery and linking via pattern rules
+# - 2025-08-10: Added install target with OS-specific deployment paths
 
 # =============================================================================
 # PROJECT METADATA
@@ -66,6 +67,7 @@ endif
 UNAME := $(shell uname)
 ARCH := $(shell uname -m)
 PLATFORM := unknown
+DISTRO := $(shell sh -c 'if [ -f /etc/os-release ]; then . /etc/os-release && echo $$ID; fi')
 
 ifeq ($(UNAME), Darwin)
 	PLATFORM := macos
@@ -298,6 +300,29 @@ distclean: clean
 	find . -name "*.pyc" -delete
 	rm -f CHANGELOG.md
 	@echo "✓ Full deep clean complete"
+
+# =============================================================================
+# INSTALLATION
+# =============================================================================
+install: all
+ifeq ($(PLATFORM),macos)
+	install -m 755 bin/ternary-fission-reactor /usr/bin/ternary-fission-reactor
+	install -m 755 bin/ternary-api /usr/bin/ternary-api
+	mkdir -p /etc/bthl
+	install -m 644 configs/daemon.config /etc/bthl/ternary-fission-daemon.config
+	install -m 644 configs/ternary_fission.conf /etc/bthl/ternary-api.config
+else ifeq ($(DISTRO),debian)
+	install -D bin/ternary-fission-reactor /usr/bin/ternary-fission-reactor
+	install -D bin/ternary-api /usr/bin/ternary-api
+	install -D -m 644 configs/daemon.config /etc/bthl/ternary-fission-daemon.config
+	install -D -m 644 configs/ternary_fission.conf /etc/bthl/ternary-api.config
+else
+	@echo "Unsupported platform for installation" && exit 1
+endif
+	@mkdir -p /var/www/bthl/ternary-fission-web
+	@cp -r webroot/* /var/www/bthl/ternary-fission-web/
+	@mkdir -p /var/lib/media
+	@echo "✓ Installed binaries, configuration, web assets, and media directory"
 
 # =============================================================================
 # PACKAGE AND DIST

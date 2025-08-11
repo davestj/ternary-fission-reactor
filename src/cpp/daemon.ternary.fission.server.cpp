@@ -417,6 +417,28 @@ bool DaemonTernaryFissionServer::restartDaemon() {
 }
 
 /**
+ * We run the main daemon loop executing health checks
+ * This loop validates configuration and permissions until shutdown is requested
+ */
+void DaemonTernaryFissionServer::runMainLoop() {
+    while (!shutdown_requested_.load(std::memory_order_relaxed)) {
+        statistics_->incrementRequests();
+        bool success = validateDaemonConfiguration() && checkRequiredPermissions();
+        if (success) {
+            statistics_->incrementSuccessful();
+        } else {
+            statistics_->incrementErrors();
+        }
+        if (shutdown_requested_.load(std::memory_order_relaxed)) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+    }
+
+    stopDaemon();
+}
+
+/**
  * We check if the daemon is currently running
  * This method returns the current operational status
  */
