@@ -30,6 +30,13 @@ The 2.0.0 release candidate targets cross-platform build stability, API and dash
 - Kubernetes-ready configuration and release workflows
 - See [ARCH.md](ARCH.md), [HOW-TO.md](HOW-TO.md), [docs/BENCHMARKING.md](docs/BENCHMARKING.md), and [NEXT-STEPS.md](NEXT-STEPS.md) for RC milestone details
 
+## Recent Enhancements
+
+- **Portal trigger simulation API**: Introduced endpoints and dashboard controls for initiating portal operations ([PR #105](https://github.com/davestj/ternary-fission-reactor/pull/105)).
+- **Power monitoring dashboard**: Added Chart.js visuals and estimated power tracking for real-time insight ([PR #107](https://github.com/davestj/ternary-fission-reactor/pull/107), [PR #106](https://github.com/davestj/ternary-fission-reactor/pull/106)).
+- **Debian package support**: Added DEB packaging steps to streamline distribution ([PR #114](https://github.com/davestj/ternary-fission-reactor/pull/114)).
+- **Release version automation**: Build workflow now computes release version from development runs ([PR #113](https://github.com/davestj/ternary-fission-reactor/pull/113)).
+
 ## Architecture
 
 See [ARCH.md](ARCH.md) for a complete description of the physics engine, API server, monitoring stack, and container layout.
