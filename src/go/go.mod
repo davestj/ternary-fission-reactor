@@ -11,32 +11,33 @@
 // 2025-07-29: Integrated Prometheus metrics collection and monitoring
 // 2025-07-29: Added JSON processing and HTTP routing dependencies
 // 2025-07-29: Included security and cryptographic libraries for energy simulation
+// 2026-07-27: Modernization — Go 1.25, dependency refresh, dropped gorilla/mux
+//             in favor of stdlib net/http ServeMux method+wildcard routing
 //
 // Carry-over Context:
 // - This module configuration supports the Go API server component
-// - Dependencies include HTTP routing, WebSocket communication, and metrics collection
-// - Version constraints ensure compatibility with Go 1.23+ requirements
-// - Security libraries support encryption-based energy dissipation simulation
+// - Dependencies include WebSocket communication and Prometheus metrics collection
+// - Version constraints ensure compatibility with Go 1.25+ requirements
+// - Energy dissipation is emulated via CPU/IO/memory benchmark load
 // - All dependencies are production-ready and actively maintained
 
 module ternary-fission
 
-go 1.23
+go 1.25
 
 require (
-	github.com/gorilla/mux v1.8.1
-	github.com/gorilla/websocket v1.5.1
-	github.com/prometheus/client_golang v1.19.1
+	github.com/gorilla/websocket v1.5.3
+	github.com/prometheus/client_golang v1.20.5
 )
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	golang.org/x/net v0.26.0 // indirect
-	golang.org/x/sys v0.21.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 )

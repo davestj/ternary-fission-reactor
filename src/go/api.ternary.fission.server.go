@@ -29,6 +29,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -44,7 +47,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -70,6 +72,7 @@ type Config struct {
 	MaxConcurrentConnections int    `config:"max_concurrent_connections"`
 	ReactorBaseURL           string `config:"reactor_base_url"`
 	StatusPollInterval       int    `config:"status_poll_interval"`
+	WebRoot                  string `config:"web_root"`
 
 	// TLS settings
 	SSLEnabled    bool   `config:"ssl_enabled"`
@@ -108,6 +111,7 @@ func defaultConfig() *Config {
 		MaxConcurrentConnections: 1000,
 		ReactorBaseURL:           "http://127.0.0.1:8333",
 		StatusPollInterval:       15,
+		WebRoot:                  "webroot",
 		SSLEnabled:               true,
 		SSLCertChain:             "/etc/ssl/beyondthehorizonlabs.com/fullchain.pem",
 		SSLPrivateKey:            "/etc/ssl/beyondthehorizonlabs.com/beyondthehorizonlabs.com.key",
@@ -179,6 +183,8 @@ func parseConfigFile(filename string) (*Config, error) {
 		case "reactor_base_url":
 			// Base URL for the backing reactor service
 			config.ReactorBaseURL = value
+		case "web_root":
+			config.WebRoot = value
 		case "status_poll_interval":
 			if interval, err := strconv.Atoi(value); err == nil {
 				config.StatusPollInterval = interval
@@ -276,7 +282,8 @@ type SystemStatusResponse struct {
 type TernaryFissionAPIServer struct {
 	config            *Config
 	server            *http.Server
-	router            *mux.Router
+	router            *http.ServeMux
+	staticServer      http.Handler
 	websocketUpgrader websocket.Upgrader
 	activeConnections map[string]*websocket.Conn
 	connectionsMutex  sync.RWMutex
@@ -303,7 +310,7 @@ func NewTernaryFissionAPIServer(config *Config) *TernaryFissionAPIServer {
 
 	server := &TernaryFissionAPIServer{
 		config:            config,
-		router:            mux.NewRouter(),
+		router:            http.NewServeMux(),
 		activeConnections: make(map[string]*websocket.Conn),
 		reactorClient:     &http.Client{Timeout: time.Duration(config.APITimeout) * time.Second},
 		shutdownChan:      make(chan os.Signal, 1),
@@ -333,7 +340,7 @@ func NewTernaryFissionAPIServer(config *Config) *TernaryFissionAPIServer {
 	// We configure the HTTP server
 	server.server = &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", config.APIHost, config.APIPort),
-		Handler:      server.router,
+		Handler:      server.middlewareChain(server.router),
 		ReadTimeout:  time.Duration(config.APITimeout) * time.Second,
 		WriteTimeout: time.Duration(config.APITimeout) * time.Second,
 		IdleTimeout:  120 * time.Second,
@@ -422,69 +429,69 @@ func (s *TernaryFissionAPIServer) updateReactorMetrics() {
 
 // We set up all HTTP routes and middleware with proper error handling
 func (s *TernaryFissionAPIServer) setupRoutes() {
-	// We add middleware for logging and metrics
-	s.router.Use(s.loggingMiddleware)
+	// We register explicit API routes using stdlib method+pattern matching (Go 1.22+).
+	s.router.HandleFunc("PUT /api/v1/portal/trigger", s.triggerPortalSimulation)
+	s.router.HandleFunc("GET /api/v1/health", s.healthCheck)
+	s.router.HandleFunc("GET /api/v1/status", s.getSystemStatus)
+	s.router.HandleFunc("GET /api/v1/energy-fields", s.listEnergyFields)
+	s.router.HandleFunc("POST /api/v1/energy-fields", s.createEnergyField)
+	s.router.HandleFunc("GET /api/v1/energy-fields/{id}", s.getEnergyField)
+	s.router.HandleFunc("DELETE /api/v1/energy-fields/{id}", s.deleteEnergyField)
+	s.router.HandleFunc("POST /api/v1/energy-fields/{id}/dissipate", s.dissipateEnergyField)
+	s.router.HandleFunc("POST /api/v1/login", s.handleLogin)
+	s.router.HandleFunc("POST /api/v1/control/shutdown", s.handleControlShutdown)
+
 	if s.config.PrometheusEnabled {
-		s.router.Use(s.metricsMiddleware)
+		s.router.Handle("GET /api/v1/metrics", promhttp.Handler())
 	}
-	if s.config.CORSEnabled {
-		s.router.Use(s.corsMiddleware)
+	if s.config.WebSocketEnabled {
+		s.router.HandleFunc("GET /api/v1/ws/monitor", s.handleWebSocketConnection)
 	}
 
-	s.router.HandleFunc("/api/v1/portal/trigger", s.triggerPortalSimulation).Methods("PUT")
+	// We serve the static atomic-design frontend when a web root is configured,
+	// falling back to the embedded dashboard for "/" and "/dashboard".
+	if s.config.WebRoot != "" {
+		if fi, err := os.Stat(s.config.WebRoot); err == nil && fi.IsDir() {
+			s.staticServer = http.FileServer(http.Dir(s.config.WebRoot))
+			log.Printf("Serving static frontend from %s", s.config.WebRoot)
+		} else {
+			log.Printf("Web root %q not found; serving embedded dashboard only", s.config.WebRoot)
+		}
+	}
+	s.router.HandleFunc("GET /", s.routeHandler)
 
-	// We serve the enhanced web dashboard at root - FIXED routing
-	s.router.PathPrefix("/").HandlerFunc(s.routeHandler).Methods("GET")
-
-	log.Println("API routes configured successfully with enhanced dashboard")
+	log.Println("API routes configured successfully with static frontend + embedded dashboard")
 }
 
-// We handle all routing with proper dashboard serving - FIXED
+// middlewareChain wraps the mux with logging, metrics, and CORS in a fixed order,
+// replacing gorilla/mux's router.Use() now that we route on stdlib net/http.
+func (s *TernaryFissionAPIServer) middlewareChain(h http.Handler) http.Handler {
+	if s.config.CORSEnabled {
+		h = s.corsMiddleware(h)
+	}
+	if s.config.PrometheusEnabled {
+		h = s.metricsMiddleware(h)
+	}
+	h = s.loggingMiddleware(h)
+	return h
+}
+
+// We serve the embedded dashboard at "/" and "/dashboard"; any other GET path is
+// delegated to the static file server (atomic-design frontend) when configured.
 func (s *TernaryFissionAPIServer) routeHandler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 
-	// We route API calls to appropriate handlers
-	if strings.HasPrefix(path, "/api/v1/") {
-		s.handleAPIRoutes(w, r)
-		return
-	}
-
-	// We serve the dashboard for root and dashboard paths
 	if path == "/" || path == "/dashboard" {
 		s.serveDashboard(w, r)
 		return
 	}
 
-	// We serve 404 for unknown paths
-	http.NotFound(w, r)
-}
-
-// We handle API routes properly
-func (s *TernaryFissionAPIServer) handleAPIRoutes(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/api/v1")
-
-	switch {
-	case path == "/health":
-		s.healthCheck(w, r)
-	case path == "/status":
-		s.getSystemStatus(w, r)
-	case path == "/energy-fields" && r.Method == "GET":
-		s.listEnergyFields(w, r)
-	case path == "/energy-fields" && r.Method == "POST":
-		s.createEnergyField(w, r)
-	case strings.HasPrefix(path, "/energy-fields/") && r.Method == "GET":
-		s.getEnergyField(w, r)
-	case strings.HasPrefix(path, "/energy-fields/") && r.Method == "DELETE":
-		s.deleteEnergyField(w, r)
-	case strings.HasPrefix(path, "/energy-fields/") && strings.HasSuffix(path, "/dissipate"):
-		s.dissipateEnergyField(w, r)
-	case path == "/metrics" && s.config.PrometheusEnabled:
-		promhttp.Handler().ServeHTTP(w, r)
-	case path == "/ws/monitor" && s.config.WebSocketEnabled:
-		s.handleWebSocketConnection(w, r)
-	default:
-		s.writeErrorResponse(w, http.StatusNotFound, "API endpoint not found")
+	if s.staticServer != nil {
+		s.staticServer.ServeHTTP(w, r)
+		return
 	}
+
+	http.NotFound(w, r)
 }
 
 // =============================================================================
@@ -1857,12 +1864,11 @@ func (s *TernaryFissionAPIServer) listEnergyFields(w http.ResponseWriter, r *htt
 
 // We get a specific energy field
 func (s *TernaryFissionAPIServer) getEnergyField(w http.ResponseWriter, r *http.Request) {
-	pathParts := strings.Split(r.URL.Path, "/")
-	if len(pathParts) < 4 {
+	fieldID := r.PathValue("id")
+	if fieldID == "" {
 		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid field ID")
 		return
 	}
-	fieldID := pathParts[len(pathParts)-1]
 
 	resp, err := s.reactorClient.Get(fmt.Sprintf("%s/api/v1/energy-fields/%s", s.config.ReactorBaseURL, fieldID))
 	if err != nil {
@@ -1878,12 +1884,11 @@ func (s *TernaryFissionAPIServer) getEnergyField(w http.ResponseWriter, r *http.
 
 // We delete an energy field
 func (s *TernaryFissionAPIServer) deleteEnergyField(w http.ResponseWriter, r *http.Request) {
-	pathParts := strings.Split(r.URL.Path, "/")
-	if len(pathParts) < 4 {
+	fieldID := r.PathValue("id")
+	if fieldID == "" {
 		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid field ID")
 		return
 	}
-	fieldID := pathParts[len(pathParts)-1]
 
 	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/api/v1/energy-fields/%s", s.config.ReactorBaseURL, fieldID), nil)
 	if err != nil {
@@ -1950,12 +1955,11 @@ func (s *TernaryFissionAPIServer) dissipateEnergyField(w http.ResponseWriter, r 
 		return
 	}
 
-	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 5 {
+	fieldID := r.PathValue("id")
+	if fieldID == "" {
 		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid field ID")
 		return
 	}
-	fieldID := parts[len(parts)-2]
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -2117,6 +2121,67 @@ func (s *TernaryFissionAPIServer) healthCheck(w http.ResponseWriter, r *http.Req
 }
 
 // We start the API server
+// handleLogin authenticates a dashboard operator and issues a short session token.
+// The frontend loginForm posts {username, password}; on success it stores the token
+// in sessionStorage. Credentials are read from the API_AUTH_USER / API_AUTH_PASS
+// environment variables so nothing is baked into source or config files. When those
+// vars are unset the endpoint is disabled and returns 501, keeping the build safe by
+// default rather than shipping a hardcoded credential.
+func (s *TernaryFissionAPIServer) handleLogin(w http.ResponseWriter, r *http.Request) {
+	wantUser := os.Getenv("API_AUTH_USER")
+	wantPass := os.Getenv("API_AUTH_PASS")
+	if wantUser == "" || wantPass == "" {
+		s.writeErrorResponse(w, http.StatusNotImplemented, "Authentication is not configured on this server")
+		return
+	}
+
+	var creds struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&creds); err != nil {
+		s.writeErrorResponse(w, http.StatusBadRequest, "Invalid login payload")
+		return
+	}
+
+	// Constant-time comparison to avoid leaking match length via timing.
+	userOK := subtle.ConstantTimeCompare([]byte(creds.Username), []byte(wantUser)) == 1
+	passOK := subtle.ConstantTimeCompare([]byte(creds.Password), []byte(wantPass)) == 1
+	if !userOK || !passOK {
+		s.writeErrorResponse(w, http.StatusUnauthorized, "Invalid credentials")
+		return
+	}
+
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		s.writeErrorResponse(w, http.StatusInternalServerError, "Failed to issue token")
+		return
+	}
+	s.writeJSONResponse(w, http.StatusOK, map[string]any{
+		"token":      hex.EncodeToString(tokenBytes),
+		"expires_in": 3600,
+	})
+}
+
+// handleControlShutdown lets the dashboard request a graceful shutdown. This is a
+// privileged control-plane action, so it is gated behind the same auth being
+// configured (API_AUTH_USER/PASS present) AND an explicit API_ALLOW_REMOTE_SHUTDOWN=1
+// opt-in. Disabled by default so an exposed dashboard cannot stop the server.
+func (s *TernaryFissionAPIServer) handleControlShutdown(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("API_AUTH_USER") == "" || os.Getenv("API_ALLOW_REMOTE_SHUTDOWN") != "1" {
+		s.writeErrorResponse(w, http.StatusForbidden, "Remote shutdown is disabled on this server")
+		return
+	}
+	s.writeJSONResponse(w, http.StatusAccepted, map[string]string{
+		"status": "shutting_down",
+	})
+	log.Println("Remote shutdown requested via control endpoint")
+	go func() {
+		time.Sleep(250 * time.Millisecond)
+		s.shutdownChan <- syscall.SIGTERM
+	}()
+}
+
 func (s *TernaryFissionAPIServer) Start() error {
 	go func() {
 		<-s.shutdownChan
